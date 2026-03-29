@@ -1,0 +1,33 @@
+
+[functions.send-pick-request]
+enabled = true
+verify_jwt = true
+import_map = "./functions/send-pick-request/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/send-pick-request/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/send-pick-request/*.html" ]
+
+[functions.send-weekly-results]
+enabled = true
+verify_jwt = true
+import_map = "./functions/send-weekly-results/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/send-weekly-results/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/send-weekly-results/*.html" ]
+
+[functions.get-field]
+enabled = true
+verify_jwt = true
+import_map = "./functions/get-field/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/get-field/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/get-field/*.html" ]

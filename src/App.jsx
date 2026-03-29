@@ -1,15 +1,79 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from "recharts";
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
+const BILLS_BLUE = "#00338D";
+const BILLS_RED = "#C60C30";
+const BILLS_WHITE = "#FFFFFF";
+const BG = "#040d1f";
+const BG2 = "#071128";
+const BORDER = "rgba(0,51,141,0.25)";
+const COLORS = [
+  "#C60C30",
+  "#00338D",
+  "#E8193C",
+  "#1A4FAD",
+  "#FF6B81",
+  "#4A7FD4",
+  "#FFFFFF",
+];
+
+const PREVIOUS_WINNERS = {
+  'WM Phoenix Open': 'Thomas Detry',
+  'AT&T Pebble Beach Pro-Am': 'Rory McIlroy',
+  'Cognizant Classic': 'Joe Highsmith',
+  'Arnold Palmer Invitational pres. by Mastercard': 'Russell Henley',
+  'THE PLAYERS Championship': 'Rory McIlroy',
+  'Valspar Championship': 'Victor Hovland',
+  'Texas Children\'s Houston Open': 'Min Woo Lee',
+  'Valero Texas Open': 'Brian Harman',
+  'Masters Tournament': 'Rory McIlroy',
+  'RBC Heritage': 'Justin Thomas',
+  'Zurich Classic of New Orleans': 'A. Novak / B. Griffin',
+  'Cadillac Championship': '—',
+  'Truist Championship': 'Sepp Straka',
+  'ONEflight Myrtle Beach Classic': 'Ryan Fox',
+  'PGA Championship': 'Scottie Scheffler',
+  'THE CJ CUP Byron Nelson': 'Scottie Scheffler',
+  'Charles Schwab Challenge': 'Ben Griffin',
+  'the Memorial Tournament pres. by Workday': 'Scottie Scheffler',
+  'RBC Canadian Open': 'Ryan Fox',
+  'U.S. Open': 'J.J. Spaun',
+  'Travelers Championship': 'Keegan Bradley',
+  'John Deere Classic': 'Brian Campbell',
+  'Genesis Scottish Open': 'Chris Gotterup',
+  'ISCO Championship': 'William Mouw',
+  'The Open': 'Scottie Scheffler',
+  'Corales Puntacana Championship': 'Garrick Higgo',
+  '3M Open': 'Kurt Kitayama',
+  'Rocket Classic': 'Aldrich Potgieter',
+  'Wyndham Championship': 'Cameron Young',
+  'FedEx St. Jude Championship': 'Justin Rose',
+  'BMW Championship': 'Scottie Scheffler',
+  'TOUR Championship': 'Tommy Fleetwood',
+};
+
+const PRESET_AVATARS = [
+  "🏌️","🦬","⛳","🏆","🦅","💪","🎯","🔥","😎","🤠",
+  "👑","💰","🎱","🦁","🐯","🦊","🐻","🤑","😤","🏅"
+];
+
 const fmt = (n) => n >= 1000000 ? `$${(n/1000000).toFixed(2)}M` : n >= 1000 ? `$${(n/1000).toFixed(0)}K` : `$${n.toLocaleString()}`;
 const fmtFull = (n) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-const COLORS = ["#22c55e","#3b82f6","#f59e0b","#ef4444","#a855f7","#06b6d4","#f97316"];
+
+const NAV = [
+  { id: "dashboard", label: "Dashboard", icon: "📊" },
+  { id: "thisweek", label: "This Week", icon: "⛳" },
+  { id: "picks", label: "Picks", icon: "🏌️" },
+  { id: "board", label: "Bulletin Board", icon: "📌" },
+  { id: "schedule", label: "Schedule", icon: "📅" },
+  { id: "members", label: "Members", icon: "👥" },
+];
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -17,6 +81,13 @@ export default function App() {
   const [baggers, setBaggers] = useState([]);
   const [picks, setPicks] = useState([]);
   const [tournaments, setTournaments] = useState([]);
+  const [field, setField] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [newPost, setNewPost] = useState("");
+  const [postCategory, setPostCategory] = useState("banter");
+  const [currentBagger, setCurrentBagger] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -31,20 +102,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchData();
-    }
+    if (session) fetchData();
   }, [session]);
 
   async function fetchData() {
-    const [{ data: b }, { data: p }, { data: t }] = await Promise.all([
+    const [{ data: b }, { data: p }, { data: t }, { data: f }, { data: po }] = await Promise.all([
       supabase.from("baggers").select("*"),
-      supabase.from("picks").select("*, baggers(name), tournaments(week_number, name)"),
+      supabase.from("picks").select("*, baggers(name, avatar_url), tournaments(week_number, name)"),
       supabase.from("tournaments").select("*").order("week_number"),
+      supabase.from("weekly_field").select("*").order("owgr_rank", { ascending: true, nullsFirst: false }),
+      supabase.from("posts").select("*").order("created_at", { ascending: false }),
     ]);
     if (b) setBaggers(b);
     if (p) setPicks(p);
     if (t) setTournaments(t);
+    if (f) setField(f);
+    if (po) setPosts(po);
   }
 
   async function handleLogin(e) {
@@ -59,35 +132,77 @@ export default function App() {
     setSession(null);
   }
 
+  async function uploadAvatar(baggerId, file) {
+    setUploadingAvatar(true);
+    const ext = file.name.split(".").pop();
+    const path = `${baggerId}.${ext}`;
+    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+      await supabase.from("baggers").update({ avatar_url: publicUrl }).eq("id", baggerId);
+      setBaggers(prev => prev.map(b => b.id === baggerId ? { ...b, avatar_url: publicUrl } : b));
+    }
+    setUploadingAvatar(false);
+  }
+
+  async function setEmojiAvatar(baggerId, emoji) {
+    await supabase.from("baggers").update({ avatar_url: emoji }).eq("id", baggerId);
+    setBaggers(prev => prev.map(b => b.id === baggerId ? { ...b, avatar_url: emoji } : b));
+    setShowAvatarPicker(null);
+  }
+
+  function Avatar({ bagger, size = 40, i = 0 }) {
+    const isEmoji = bagger?.avatar_url && !bagger.avatar_url.startsWith("http");
+    const isPhoto = bagger?.avatar_url && bagger.avatar_url.startsWith("http");
+    return (
+      <div style={{ width: size, height: size, borderRadius: "50%", background: `${COLORS[i % COLORS.length]}22`, border: `2px solid ${COLORS[i % COLORS.length]}66`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+        {isPhoto ? (
+          <img src={bagger.avatar_url} alt={bagger.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : isEmoji ? (
+          <span style={{ fontSize: size * 0.5 }}>{bagger.avatar_url}</span>
+        ) : (
+          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: size * 0.45, color: COLORS[i % COLORS.length], fontWeight: 700 }}>{bagger?.name?.[0]}</span>
+        )}
+      </div>
+    );
+  }
+
   if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#080f1a", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontFamily: "'DM Sans', sans-serif" }}>
       Loading...
     </div>
   );
 
   if (!session) return (
-    <div style={{ minHeight: "100vh", background: "#080f1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24 }}>
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400&display=swap" rel="stylesheet" />
-      <div style={{ width: 360, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 20, padding: 40 }}>
-        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: "#f1f5f9", marginBottom: 6 }}>⛳ Golf Pool</div>
-        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 28 }}>Sign in to access the pool</div>
-        {authError && <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 16 }}>{authError}</div>}
+      <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ width: 180, marginBottom: 8 }} />
+      <div style={{ width: 360, background: "rgba(0,51,141,0.15)", border: `1px solid ${BORDER}`, borderRadius: 20, padding: 40 }}>
+        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: BILLS_WHITE, marginBottom: 4, textAlign: "center" }}>Welcome Back</div>
+        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 28, textAlign: "center" }}>Sign in to access the pool</div>
+        {authError && (
+          <div style={{ background: "rgba(198,12,48,0.1)", border: "1px solid rgba(198,12,48,0.3)", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 16 }}>
+            {authError}
+          </div>
+        )}
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "12px 16px", color: "#f1f5f9", fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
-          <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" required style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "12px 16px", color: "#f1f5f9", fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
-          <button type="submit" style={{ background: "#22c55e", border: "none", borderRadius: 10, padding: "12px", color: "#0f172a", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>Sign In</button>
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required
+            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
+          <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" required
+            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
+          <button type="submit"
+            style={{ background: BILLS_RED, border: "none", borderRadius: 10, padding: "12px", color: BILLS_WHITE, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 4, letterSpacing: "0.04em" }}>
+            SIGN IN
+          </button>
         </form>
       </div>
     </div>
   );
 
-  // Build leaderboard data
   const totals = {};
   baggers.forEach(b => { totals[b.name] = 0; });
   picks.forEach(p => { if (p.baggers?.name) totals[p.baggers.name] = (totals[p.baggers.name] || 0) + Number(p.earnings || 0); });
   const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-
-  // Weekly trend data
   const weekNums = [...new Set(picks.map(p => p.tournaments?.week_number))].filter(Boolean).sort((a,b)=>a-b);
   const trendData = weekNums.map(w => {
     const row = { week: `W${w}` };
@@ -97,98 +212,117 @@ export default function App() {
     });
     return row;
   });
-
   const barData = sorted.map(([name, total]) => ({ name, total }));
-
-  const NAV = [
-    { id: "dashboard", label: "Dashboard", icon: "📊" },
-    { id: "picks", label: "Picks", icon: "🏌️" },
-    { id: "members", label: "Members", icon: "👥" },
-  ];
+  const today = new Date();
 
   return (
-    <div style={{ minHeight: "100vh", background: "#080f1a", color: "#f1f5f9", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: BG, color: BILLS_WHITE, fontFamily: "'DM Sans', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400&display=swap" rel="stylesheet" />
 
       {/* Sidebar */}
-      <div style={{ position: "fixed", left: 0, top: 0, bottom: 0, width: 200, background: "rgba(255,255,255,0.02)", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", padding: "28px 14px", zIndex: 10 }}>
-        <div style={{ marginBottom: 32, paddingLeft: 8 }}>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: "#f1f5f9" }}>⛳ Golf Pool</div>
-          <div style={{ fontSize: 11, color: "#334155", marginTop: 2, letterSpacing: "0.06em" }}>SEASON 2025</div>
+      <div style={{ position: "fixed", left: 0, top: 0, bottom: 0, width: 210, background: BG2, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", padding: "24px 14px", zIndex: 10 }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
+          <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ width: 140 }} />
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
           {NAV.map(item => (
-            <button key={item.id} onClick={() => setPage(item.id)} style={{ background: page === item.id ? "rgba(59,130,246,0.12)" : "transparent", border: page === item.id ? "1px solid rgba(59,130,246,0.25)" : "1px solid transparent", borderRadius: 10, padding: "10px 14px", color: page === item.id ? "#93c5fd" : "#64748b", fontFamily: "'DM Sans', sans-serif", fontSize: 14, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
+            <button key={item.id} onClick={() => setPage(item.id)}
+              style={{ background: page === item.id ? "rgba(198,12,48,0.15)" : "transparent", border: page === item.id ? "1px solid rgba(198,12,48,0.4)" : "1px solid transparent", borderRadius: 10, padding: "10px 14px", color: page === item.id ? "#ff6b6b" : "#64748b", fontFamily: "'DM Sans', sans-serif", fontSize: 14, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
               {item.icon} {item.label}
             </button>
           ))}
         </nav>
-        <button onClick={handleLogout} style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "9px 14px", color: "#475569", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+        <div style={{ background: "rgba(0,51,141,0.2)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 600, marginBottom: 4 }}>2025 SEASON</div>
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>{weekNums.length} of 32 weeks complete</div>
+        </div>
+        <button onClick={handleLogout}
+          style={{ background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "9px 14px", color: "#475569", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
           Sign Out
         </button>
       </div>
 
       {/* Main */}
-      <div style={{ marginLeft: 200, padding: "32px 36px" }}>
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: "#f1f5f9", margin: 0 }}>
+      <div style={{ marginLeft: 210, padding: "32px 36px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
+          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, color: BILLS_WHITE, margin: 0 }}>
             {NAV.find(n => n.id === page)?.icon} {NAV.find(n => n.id === page)?.label}
           </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: BILLS_RED }} />
+            <span style={{ fontSize: 12, color: "#64748b" }}>Season Active</span>
+          </div>
         </div>
 
-        {/* DASHBOARD */}
+        {/* ── DASHBOARD ── */}
         {page === "dashboard" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* Stat cards */}
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               {[
-                { label: "Leader", value: sorted[0]?.[0] || "—", sub: fmtFull(sorted[0]?.[1] || 0), color: "#22c55e" },
-                { label: "Weeks Played", value: weekNums.length, sub: "Completed" },
+                { label: "Current Leader", value: sorted[0]?.[0] || "—", sub: fmtFull(sorted[0]?.[1] || 0), color: BILLS_RED },
+                { label: "Weeks Complete", value: weekNums.length, sub: "of 32 total" },
                 { label: "Total Baggers", value: baggers.length, sub: "In the pool" },
+                { label: "Total Earnings", value: fmt(sorted.reduce((a,b) => a + b[1], 0)), sub: "Across all baggers", color: "#4a90d9" },
               ].map(c => (
-                <div key={c.label} style={{ flex: 1, minWidth: 140, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "20px 24px" }}>
-                  <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{c.label}</div>
-                  <div style={{ fontSize: 26, fontFamily: "'Playfair Display', serif", color: c.color || "#f1f5f9" }}>{c.value}</div>
-                  {c.sub && <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{c.sub}</div>}
+                <div key={c.label} style={{ flex: 1, minWidth: 140, background: "rgba(0,51,141,0.12)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: "20px 24px", borderTop: `3px solid ${c.color || BILLS_BLUE}` }}>
+                  <div style={{ fontSize: 11, color: "#64748b", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>{c.label}</div>
+                  <div style={{ fontSize: 26, fontFamily: "'Playfair Display', serif", color: c.color || BILLS_WHITE }}>{c.value}</div>
+                  {c.sub && <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>{c.sub}</div>}
                 </div>
               ))}
             </div>
 
-            {/* Leaderboard + Bar chart */}
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: 260, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, overflow: "hidden" }}>
-                <div style={{ padding: "16px 24px", borderBottom: "1px solid rgba(255,255,255,0.07)", fontFamily: "'Playfair Display', serif", fontSize: 15, color: "#f1f5f9" }}>Season Leaderboard</div>
-                {sorted.map(([name, total], i) => (
-                  <div key={name} style={{ display: "flex", alignItems: "center", padding: "10px 24px", background: i === 0 ? "rgba(34,197,94,0.06)" : "transparent", borderLeft: i === 0 ? "3px solid #22c55e" : "3px solid transparent" }}>
-                    <div style={{ width: 28, fontFamily: "'DM Mono', monospace", fontSize: 12, color: i === 0 ? "#22c55e" : "#64748b" }}>#{i+1}</div>
-                    <div style={{ flex: 1, fontSize: 14, color: "#e2e8f0", fontWeight: i === 0 ? 600 : 400 }}>{name}</div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: i === 0 ? "#22c55e" : "#94a3b8" }}>{fmtFull(total)}</div>
-                  </div>
-                ))}
+              <div style={{ flex: 1, minWidth: 260, background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "16px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE }}>Season Leaderboard</span>
+                </div>
+                {sorted.map(([name, total], i) => {
+                  const bagger = baggers.find(b => b.name === name);
+                  return (
+                    <div key={name} style={{ display: "flex", alignItems: "center", padding: "10px 24px", background: i === 0 ? "rgba(198,12,48,0.08)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", borderLeft: i === 0 ? `3px solid ${BILLS_RED}` : "3px solid transparent", gap: 10 }}>
+                      <div style={{ width: 24, fontFamily: "'DM Mono', monospace", fontSize: 12, color: i === 0 ? BILLS_RED : "#475569" }}>#{i+1}</div>
+                      {bagger && <Avatar bagger={bagger} size={28} i={i} />}
+                      <div style={{ flex: 1, fontSize: 14, color: i === 0 ? BILLS_WHITE : "#94a3b8", fontWeight: i === 0 ? 600 : 400 }}>{name}</div>
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: i === 0 ? BILLS_RED : "#64748b" }}>{fmtFull(total)}</div>
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{ flex: 2, minWidth: 300, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20 }}>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: "#f1f5f9", marginBottom: 16 }}>Earnings by Bagger</div>
-                <ResponsiveContainer width="100%" height={200}>
+
+              <div style={{ flex: 2, minWidth: 300, background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE }}>Earnings by Bagger</span>
+                </div>
+                <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={barData}>
                     <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={v => fmt(v)} tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} width={55} />
-                    <Tooltip formatter={v => fmtFull(v)} contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#f1f5f9" }} />
-                    <Bar dataKey="total" radius={[6,6,0,0]} fill="#3b82f6" />
+                    <Tooltip formatter={v => fmtFull(v)} contentStyle={{ background: BG2, border: `1px solid ${BORDER}`, borderRadius: 8, color: BILLS_WHITE }} />
+                    <Bar dataKey="total" radius={[6,6,0,0]}>
+                      {barData.map((entry, i) => (
+                        <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Trend */}
             {trendData.length > 0 && (
-              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20 }}>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: "#f1f5f9", marginBottom: 16 }}>Weekly Earnings Trend</div>
-                <ResponsiveContainer width="100%" height={200}>
+              <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                  <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE }}>Weekly Earnings Trend</span>
+                </div>
+                <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,51,141,0.2)" />
                     <XAxis dataKey="week" tick={{ fill: "#64748b", fontSize: 12 }} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={v => fmt(v)} tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} width={55} />
-                    <Tooltip formatter={v => fmtFull(v)} contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#f1f5f9" }} />
+                    <Tooltip formatter={v => fmtFull(v)} contentStyle={{ background: BG2, border: `1px solid ${BORDER}`, borderRadius: 8, color: BILLS_WHITE }} />
                     <Legend wrapperStyle={{ color: "#94a3b8", fontSize: 12 }} />
                     {baggers.map((b, i) => (
                       <Line key={b.name} type="monotone" dataKey={b.name} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
@@ -197,63 +331,371 @@ export default function App() {
                 </ResponsiveContainer>
               </div>
             )}
+
+            <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ padding: "16px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE }}>Weekly Breakdown</span>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                      <th style={{ padding: "10px 24px", textAlign: "left", color: "#64748b", fontWeight: 500 }}>Bagger</th>
+                      {weekNums.map(w => <th key={w} style={{ padding: "10px 16px", textAlign: "right", color: "#64748b", fontWeight: 500 }}>Wk {w}</th>)}
+                      <th style={{ padding: "10px 24px", textAlign: "right", color: BILLS_WHITE, fontWeight: 600 }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map(([name, total], ri) => (
+                      <tr key={name} style={{ borderBottom: `1px solid rgba(0,51,141,0.1)`, background: ri % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent" }}>
+                        <td style={{ padding: "10px 24px", color: "#e2e8f0", fontWeight: 500 }}>{name}</td>
+                        {weekNums.map(w => {
+                          const pick = picks.find(p => p.tournaments?.week_number === w && p.baggers?.name === name);
+                          const amt = pick ? Number(pick.earnings || 0) : 0;
+                          return (
+                            <td key={w} style={{ padding: "10px 16px", textAlign: "right", color: amt > 500000 ? BILLS_RED : "#64748b", fontFamily: "'DM Mono', monospace" }}>
+                              {fmtFull(amt)}
+                            </td>
+                          );
+                        })}
+                        <td style={{ padding: "10px 24px", textAlign: "right", color: BILLS_WHITE, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{fmtFull(total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* PICKS */}
+        {/* ── THIS WEEK ── */}
+        {page === "thisweek" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {(() => {
+              const current = tournaments.find(t => {
+                const s = new Date(t.start_date), e = new Date(t.end_date);
+                return s <= today && e >= today;
+              });
+              return current ? (
+                <div style={{ background: "rgba(198,12,48,0.08)", border: "1px solid rgba(198,12,48,0.25)", borderRadius: 16, padding: "20px 28px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 700, marginBottom: 6 }}>🔴 LIVE THIS WEEK</div>
+                      <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: BILLS_WHITE, marginBottom: 4 }}>{current.name}</div>
+                      <div style={{ fontSize: 13, color: "#64748b" }}>{current.course}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 20 }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: "#475569", marginBottom: 4 }}>PURSE</div>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 16, color: "#4a90d9", fontWeight: 700 }}>${(current.purse/1000000).toFixed(1)}M</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: "#475569", marginBottom: 4 }}>FIELD</div>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 16, color: BILLS_WHITE, fontWeight: 700 }}>{field.length}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: "20px 28px" }}>
+                  <div style={{ fontSize: 13, color: "#64748b" }}>No tournament currently in progress — check back during tournament week.</div>
+                </div>
+              );
+            })()}
+
+            <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ padding: "16px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE }}>This Week's Field</span>
+                </div>
+                <div style={{ fontSize: 12, color: "#475569" }}>Sorted by World Ranking · {field.length} players</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "60px 1fr 80px 100px", gap: 16, padding: "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.15)` }}>
+                {["OWGR", "PLAYER", "STATUS", "PICKED BY"].map(h => (
+                  <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: "0.1em", fontWeight: 600 }}>{h}</div>
+                ))}
+              </div>
+              <div style={{ maxHeight: 600, overflowY: "auto" }}>
+                {field.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: "center", color: "#475569", fontSize: 14 }}>Field data not loaded yet.</div>
+                ) : (
+                  field.map((player, i) => {
+                    const currentWeek = tournaments.find(t => {
+                      const s = new Date(t.start_date), e = new Date(t.end_date);
+                      return s <= today && e >= today;
+                    });
+                    const pickedBy = currentWeek ? picks
+                      .filter(p => p.tournaments?.week_number === currentWeek.week_number &&
+                        p.golfer_name?.toLowerCase() === player.player_name?.toLowerCase())
+                      .map(p => p.baggers?.name).join(", ") : "";
+                    return (
+                      <div key={player.id} style={{ display: "grid", gridTemplateColumns: "60px 1fr 80px 100px", gap: 16, padding: "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.06)`, background: pickedBy ? "rgba(198,12,48,0.05)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", alignItems: "center" }}>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: player.owgr_rank <= 10 ? BILLS_RED : player.owgr_rank <= 50 ? "#4a90d9" : "#475569" }}>
+                          {player.owgr_rank ? `#${player.owgr_rank}` : "—"}
+                        </div>
+                        <div style={{ fontSize: 13, color: pickedBy ? BILLS_WHITE : "#94a3b8", fontWeight: pickedBy ? 600 : 400 }}>
+                          {player.player_name}
+                          {player.amateur && <span style={{ fontSize: 10, color: "#475569", marginLeft: 6 }}>(A)</span>}
+                        </div>
+                        <div style={{ fontSize: 11 }}>
+                          {player.owgr_rank <= 10 ? <span style={{ color: BILLS_RED, fontWeight: 600 }}>Top 10</span> :
+                           player.owgr_rank <= 50 ? <span style={{ color: "#4a90d9" }}>Top 50</span> :
+                           player.owgr_rank <= 100 ? <span style={{ color: "#64748b" }}>Top 100</span> :
+                           <span style={{ color: "#334155" }}>Field</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: BILLS_RED, fontWeight: 600 }}>{pickedBy || ""}</div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── PICKS ── */}
         {page === "picks" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {tournaments.map(t => (
-              <div key={t.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, overflow: "hidden" }}>
-                <div style={{ padding: "16px 24px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: "#f1f5f9" }}>{t.name}</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{t.course} · Week {t.week_number} · Purse: {fmt(t.purse || 0)}</div>
+            {tournaments
+              .filter(t => picks.some(p => p.tournaments?.week_number === t.week_number))
+              .sort((a, b) => b.week_number - a.week_number)
+              .map(t => (
+                <div key={t.id} style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+                  <div style={{ padding: "14px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,51,141,0.1)" }}>
+                    <div>
+                      <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: BILLS_WHITE }}>{t.name}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{t.course} · Week {t.week_number} · Purse: {fmt(t.purse || 0)}</div>
+                    </div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#475569", background: "rgba(0,51,141,0.2)", padding: "4px 10px", borderRadius: 6 }}>Week {t.week_number}</div>
+                  </div>
+                  <div style={{ padding: 8 }}>
+                    {picks.filter(p => p.tournaments?.week_number === t.week_number)
+                      .sort((a,b) => Number(b.earnings||0) - Number(a.earnings||0))
+                      .map((pick, i) => {
+                        const bagger = baggers.find(b => b.name === pick.baggers?.name);
+                        const bi = baggers.findIndex(b => b.name === pick.baggers?.name);
+                        return (
+                          <div key={pick.id} style={{ display: "flex", alignItems: "center", padding: "10px 16px", borderRadius: 8, gap: 12, background: i === 0 ? "rgba(198,12,48,0.05)" : "transparent" }}>
+                            <div style={{ width: 24, fontFamily: "'DM Mono', monospace", fontSize: 11, color: i === 0 ? BILLS_RED : "#475569" }}>#{i+1}</div>
+                            {bagger && <Avatar bagger={bagger} size={28} i={bi} />}
+                            <div style={{ width: 60, fontSize: 13, color: BILLS_WHITE, fontWeight: 500 }}>{pick.baggers?.name}</div>
+                            <div style={{ flex: 1, fontSize: 13, color: "#64748b" }}>{pick.golfer_name}</div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: Number(pick.earnings||0) > 500000 ? BILLS_RED : "#64748b" }}>
+                              {fmtFull(Number(pick.earnings||0))}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
-                <div style={{ padding: 8 }}>
-                  {picks.filter(p => p.tournaments?.week_number === t.week_number)
-                    .sort((a,b) => Number(b.earnings||0) - Number(a.earnings||0))
-                    .map((pick, i) => (
-                      <div key={pick.id} style={{ display: "flex", alignItems: "center", padding: "10px 16px", borderRadius: 8, gap: 12 }}>
-                        <div style={{ width: 24, fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#475569" }}>#{i+1}</div>
-                        <div style={{ width: 70, fontSize: 13, color: "#e2e8f0", fontWeight: 500 }}>{pick.baggers?.name}</div>
-                        <div style={{ flex: 1, fontSize: 13, color: "#64748b" }}>{pick.golfer_name}</div>
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: Number(pick.earnings||0) > 500000 ? "#22c55e" : "#94a3b8" }}>{fmtFull(Number(pick.earnings||0))}</div>
-                      </div>
-                    ))}
-                  {picks.filter(p => p.tournaments?.week_number === t.week_number).length === 0 && (
-                    <div style={{ padding: "16px 24px", fontSize: 13, color: "#475569" }}>No picks submitted yet</div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {tournaments.length === 0 && (
-              <div style={{ padding: 40, textAlign: "center", color: "#475569", fontSize: 14 }}>No tournaments added yet</div>
-            )}
+              ))}
           </div>
         )}
 
-        {/* MEMBERS */}
-        {page === "members" && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-            {baggers.map((b, i) => (
-              <div key={b.id} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: "50%", background: `${COLORS[i%COLORS.length]}22`, border: `2px solid ${COLORS[i%COLORS.length]}44`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Playfair Display', serif", fontSize: 18, color: COLORS[i%COLORS.length] }}>
-                    {b.name[0]}
+        {/* ── BULLETIN BOARD ── */}
+        {page === "board" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE }}>Post to the Board</span>
+              </div>
+              <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+                {baggers.map((b, i) => (
+                  <button key={b.name} onClick={() => setCurrentBagger(b.name)}
+                    style={{ background: currentBagger === b.name ? "rgba(198,12,48,0.2)" : "rgba(255,255,255,0.04)", border: `1px solid ${currentBagger === b.name ? "rgba(198,12,48,0.4)" : BORDER}`, borderRadius: 20, padding: "6px 14px", color: currentBagger === b.name ? BILLS_RED : "#64748b", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                    <Avatar bagger={b} size={20} i={i} />
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                {[
+                  { id: "banter", label: "🗣️ Trash Talk" },
+                  { id: "pick", label: "⛳ Pick Alert" },
+                  { id: "announcement", label: "📢 Announcement" },
+                ].map(c => (
+                  <button key={c.id} onClick={() => setPostCategory(c.id)}
+                    style={{ background: postCategory === c.id ? "rgba(0,51,141,0.3)" : "rgba(255,255,255,0.03)", border: `1px solid ${postCategory === c.id ? "rgba(0,51,141,0.5)" : BORDER}`, borderRadius: 8, padding: "6px 14px", color: postCategory === c.id ? "#93c5fd" : "#475569", fontSize: 12, cursor: "pointer" }}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <textarea value={newPost} onChange={e => setNewPost(e.target.value)}
+                placeholder="What's on your mind? Trash talk welcome... 🏌️" rows={3}
+                style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+                <div style={{ fontSize: 12, color: "#475569" }}>{currentBagger ? `Posting as ${currentBagger}` : "Select your name above"}</div>
+                <button onClick={async () => {
+                  if (!newPost.trim() || !currentBagger) return;
+                  const { data } = await supabase.from("posts").insert({
+                    bagger_name: currentBagger, content: newPost.trim(), category: postCategory, reactions: {},
+                  }).select();
+                  if (data) { setPosts(prev => [data[0], ...prev]); setNewPost(""); }
+                }}
+                  style={{ background: currentBagger && newPost.trim() ? BILLS_RED : "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, padding: "10px 24px", color: currentBagger && newPost.trim() ? BILLS_WHITE : "#475569", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                  Post 📌
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {posts.length === 0 && (
+                <div style={{ padding: 40, textAlign: "center", color: "#475569", fontSize: 14 }}>No posts yet — be the first to talk trash! 🏌️</div>
+              )}
+              {posts.map(post => {
+                const categoryColors = {
+                  banter: { bg: "rgba(198,12,48,0.06)", border: "rgba(198,12,48,0.2)", label: "🗣️ Trash Talk", color: BILLS_RED },
+                  pick: { bg: "rgba(0,51,141,0.08)", border: "rgba(0,51,141,0.25)", label: "⛳ Pick Alert", color: "#4a90d9" },
+                  announcement: { bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.1)", label: "📢 Announcement", color: "#f59e0b" },
+                };
+                const cat = categoryColors[post.category] || categoryColors.banter;
+                const EMOJIS = ["🔥","😂","💀","👏","🏌️","⛳"];
+                const bagger = baggers.find(bg => bg.name === post.bagger_name);
+                const bi = baggers.findIndex(bg => bg.name === post.bagger_name);
+                return (
+                  <div key={post.id} style={{ background: cat.bg, border: `1px solid ${cat.border}`, borderRadius: 14, padding: 20 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {bagger && <Avatar bagger={bagger} size={36} i={bi} />}
+                        <div>
+                          <div style={{ fontSize: 14, color: BILLS_WHITE, fontWeight: 600 }}>{post.bagger_name}</div>
+                          <div style={{ fontSize: 11, color: "#475569" }}>
+                            {new Date(post.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 10, background: `${cat.color}22`, color: cat.color, borderRadius: 20, padding: "2px 10px", fontWeight: 600 }}>{cat.label}</span>
+                      </div>
+                      <button onClick={async () => {
+                        await supabase.from("posts").delete().eq("id", post.id);
+                        setPosts(prev => prev.filter(p => p.id !== post.id));
+                      }} style={{ background: "transparent", border: "none", color: "#334155", cursor: "pointer", fontSize: 16 }}>✕</button>
+                    </div>
+                    <p style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.6, margin: "0 0 14px" }}>{post.content}</p>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {EMOJIS.map(emoji => {
+                        const count = post.reactions?.[emoji] || 0;
+                        return (
+                          <button key={emoji} onClick={async () => {
+                            const updated = { ...post.reactions, [emoji]: (post.reactions?.[emoji] || 0) + 1 };
+                            await supabase.from("posts").update({ reactions: updated }).eq("id", post.id);
+                            setPosts(prev => prev.map(p => p.id === post.id ? { ...p, reactions: updated } : p));
+                          }}
+                            style={{ background: count > 0 ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)", border: `1px solid ${count > 0 ? "rgba(255,255,255,0.15)" : BORDER}`, borderRadius: 20, padding: "4px 10px", cursor: "pointer", fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                            {emoji} {count > 0 && <span style={{ fontSize: 11 }}>{count}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── SCHEDULE ── */}
+        {page === "schedule" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "48px 1fr 120px 90px 150px 100px", gap: 16, padding: "8px 20px", marginBottom: 4 }}>
+              {["WK", "TOURNAMENT / COURSE", "DATES", "PURSE", "PREV. WINNER", "STATUS"].map(h => (
+                <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: "0.1em", fontWeight: 600 }}>{h}</div>
+              ))}
+            </div>
+            {tournaments.map(t => {
+              const startDate = t.start_date ? new Date(t.start_date) : null;
+              const endDate = t.end_date ? new Date(t.end_date) : null;
+              const isCompleted = endDate && endDate < today;
+              const isCurrent = startDate && endDate && startDate <= today && endDate >= today;
+              const isUpcoming = startDate && startDate > today;
+              const hasPicks = picks.some(p => p.tournaments?.week_number === t.week_number);
+              const prevWinner = PREVIOUS_WINNERS[t.name] || "—";
+              return (
+                <div key={t.id} style={{ display: "grid", gridTemplateColumns: "48px 1fr 120px 90px 150px 100px", gap: 16, padding: "14px 20px", background: isCurrent ? "rgba(198,12,48,0.06)" : "rgba(0,51,141,0.05)", border: `1px solid ${isCurrent ? "rgba(198,12,48,0.25)" : BORDER}`, borderRadius: 12, alignItems: "center" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: isCompleted && hasPicks ? "rgba(198,12,48,0.15)" : isCurrent ? "rgba(198,12,48,0.2)" : "rgba(0,51,141,0.15)", border: `1px solid ${isCompleted && hasPicks || isCurrent ? "rgba(198,12,48,0.3)" : BORDER}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 600, color: isCompleted && hasPicks || isCurrent ? BILLS_RED : "#475569" }}>
+                    {t.week_number}
                   </div>
                   <div>
-                    <div style={{ fontSize: 15, color: "#f1f5f9", fontWeight: 600 }}>{b.name}</div>
-                    <div style={{ fontSize: 12, color: "#475569" }}>{b.email}</div>
+                    <div style={{ fontSize: 13, color: BILLS_WHITE, fontWeight: 500, marginBottom: 2 }}>{t.name}</div>
+                    <div style={{ fontSize: 11, color: "#475569" }}>{t.course}</div>
+                  </div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#64748b" }}>
+                    {startDate ? startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "TBD"} – {endDate ? endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "TBD"}
+                  </div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#4a90d9", fontWeight: 600 }}>{fmt(t.purse || 0)}</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>{prevWinner}</div>
+                  <div>
+                    {isCurrent && <span style={{ fontSize: 10, background: "rgba(198,12,48,0.15)", color: BILLS_RED, borderRadius: 20, padding: "3px 10px", fontWeight: 700 }}>🔴 LIVE</span>}
+                    {isCompleted && hasPicks && <span style={{ fontSize: 10, background: "rgba(0,51,141,0.2)", color: "#4a90d9", borderRadius: 20, padding: "3px 10px", fontWeight: 600 }}>✓ DONE</span>}
+                    {isCompleted && !hasPicks && <span style={{ fontSize: 10, background: "rgba(255,255,255,0.04)", color: "#334155", borderRadius: 20, padding: "3px 10px" }}>SKIPPED</span>}
+                    {isUpcoming && <span style={{ fontSize: 10, background: "rgba(255,255,255,0.04)", color: "#475569", borderRadius: 20, padding: "3px 10px" }}>UPCOMING</span>}
                   </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>Season Total</div>
-                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#e2e8f0", fontWeight: 600 }}>{fmtFull(totals[b.name] || 0)}</div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── MEMBERS ── */}
+        {page === "members" && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+            {sorted.map(([name, total], i) => {
+              const bagger = baggers.find(b => b.name === name);
+              if (!bagger) return null;
+              return (
+                <div key={bagger.id} style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${i === 0 ? "rgba(198,12,48,0.3)" : BORDER}`, borderRadius: 16, padding: 20, borderTop: `3px solid ${COLORS[i % COLORS.length]}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                    <div style={{ position: "relative" }}>
+                      <Avatar bagger={bagger} size={48} i={i} />
+                      <button onClick={() => setShowAvatarPicker(showAvatarPicker === bagger.id ? null : bagger.id)}
+                        style={{ position: "absolute", bottom: -2, right: -2, width: 18, height: 18, borderRadius: "50%", background: BILLS_RED, border: "none", cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}>
+                        ✏️
+                      </button>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 15, color: BILLS_WHITE, fontWeight: 600 }}>{bagger.name}</div>
+                      <div style={{ fontSize: 12, color: "#475569" }}>{bagger.email}</div>
+                    </div>
+                    <div style={{ marginLeft: "auto", fontFamily: "'DM Mono', monospace", fontSize: 14, color: i === 0 ? BILLS_RED : "#475569", fontWeight: 700 }}>#{i+1}</div>
+                  </div>
+
+                  {showAvatarPicker === bagger.id && (
+                    <div style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10, letterSpacing: "0.06em" }}>PICK AN AVATAR</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                        {PRESET_AVATARS.map(emoji => (
+                          <button key={emoji} onClick={() => setEmojiAvatar(bagger.id, emoji)}
+                            style={{ width: 36, height: 36, borderRadius: 8, background: bagger.avatar_url === emoji ? "rgba(198,12,48,0.2)" : "rgba(255,255,255,0.05)", border: `1px solid ${bagger.avatar_url === emoji ? "rgba(198,12,48,0.4)" : BORDER}`, cursor: "pointer", fontSize: 18 }}>
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 10 }}>
+                        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>OR UPLOAD A PHOTO</div>
+                        <input type="file" accept="image/*" onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) await uploadAvatar(bagger.id, file);
+                        }} style={{ fontSize: 12, color: "#64748b", width: "100%" }} />
+                        {uploadingAvatar && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 6 }}>Uploading...</div>}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: `1px solid ${BORDER}` }}>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Season Total</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: BILLS_WHITE, fontWeight: 600 }}>{fmtFull(total)}</div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Weeks Played</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#94a3b8" }}>
+                      {picks.filter(p => p.baggers?.name === name).length}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
