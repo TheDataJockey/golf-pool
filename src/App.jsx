@@ -89,12 +89,19 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
     supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+
+    // Sign out when browser/tab is closed
+    const handleUnload = () => {
+      supabase.auth.signOut();
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
 
   useEffect(() => {
@@ -137,17 +144,21 @@ export default function App() {
     setSession(null);
   }
 
-  async function uploadAvatar(baggerId, file) {
+async function uploadAvatar(baggerId, file) {
     setUploadingAvatar(true);
     const ext = file.name.split(".").pop();
-    const path = `${baggerId}.${ext}`;
+    const path = `public/${baggerId}.${ext}`;
     const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-    if (!error) {
-      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
-      await supabase.from("baggers").update({ avatar_url: publicUrl }).eq("id", baggerId);
-      setBaggers(prev => prev.map(b => b.id === baggerId ? { ...b, avatar_url: publicUrl } : b));
+    if (error) {
+      console.error("Upload error:", error);
+      setUploadingAvatar(false);
+      return;
     }
+    const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+    await supabase.from("baggers").update({ avatar_url: publicUrl }).eq("id", baggerId);
+    setBaggers(prev => prev.map(b => b.id === baggerId ? { ...b, avatar_url: publicUrl } : b));
     setUploadingAvatar(false);
+    setShowAvatarPicker(null);
   }
 
   async function setEmojiAvatar(baggerId, emoji) {
