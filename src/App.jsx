@@ -73,7 +73,7 @@ export default function App() {
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState("");
   const [postCategory, setPostCategory] = useState("banter");
-  const [currentBagger, setCurrentBagger] = useState("");
+  const [currentBagger, setCurrentBagger] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(null);
   const [email, setEmail] = useState("");
@@ -113,6 +113,15 @@ export default function App() {
     if (t) setTournaments(t);
     if (f) setField(f);
     if (po) setPosts(po);
+    // Match logged in user to their bagger record
+    const userEmail = session?.user?.email;
+    if (userEmail && b) {
+      const match = b.find(bagger => bagger.email.toLowerCase() === userEmail.toLowerCase());
+      if (match) {
+        setLoggedInBagger(match);
+        setCurrentBagger(match.name);
+      }
+    }
   }
 
   async function handleLogin(e) {
@@ -496,14 +505,12 @@ export default function App() {
                 <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
                 <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: BILLS_WHITE }}>Post to the Board</span>
               </div>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                {baggers.map((b, i) => (
-                  <button key={b.name} onClick={() => setCurrentBagger(b.name)}
-                    style={{ background: currentBagger === b.name ? "rgba(198,12,48,0.2)" : "rgba(255,255,255,0.04)", border: `1px solid ${currentBagger === b.name ? "rgba(198,12,48,0.4)" : BORDER}`, borderRadius: 20, padding: "5px 12px", color: currentBagger === b.name ? BILLS_RED : "#64748b", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Avatar bagger={b} size={18} i={i} />
-                    {b.name}
-                  </button>
-                ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, background: "rgba(0,51,141,0.12)", border: `1px solid ${BORDER}`, borderRadius: 12, padding: "10px 16px" }}>
+                {loggedInBagger && <Avatar bagger={loggedInBagger} size={32} i={baggers.findIndex(b => b.name === loggedInBagger.name)} />}
+                <div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>Posting as</div>
+                  <div style={{ fontSize: 15, color: BILLS_WHITE, fontWeight: 600 }}>{loggedInBagger?.name || "Unknown"}</div>
+                </div>
               </div>
               <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
                 {[{ id: "banter", label: "🗣️ Trash Talk" }, { id: "pick", label: "⛳ Pick Alert" }, { id: "announcement", label: "📢 News" }].map(c => (
