@@ -74,6 +74,7 @@ export default function App() {
   const [newPost, setNewPost] = useState("");
   const [postCategory, setPostCategory] = useState("banter");
   const [currentBagger, setCurrentBagger] = useState(null);
+  const [loggedInBagger, setLoggedInBagger] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(null);
   const [email, setEmail] = useState("");
