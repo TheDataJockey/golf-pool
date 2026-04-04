@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "./supabase.js";
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+
 const BILLS_RED = "#C60C30";
 const BILLS_WHITE = "#FFFFFF";
 const BG = "#040d1f";
