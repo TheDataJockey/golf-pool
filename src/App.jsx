@@ -89,14 +89,18 @@ export default function App() {
 
 useEffect(() => {
     // Handle password recovery from URL hash
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const rawHash = window.location.hash;
+    const cleanHash = rawHash.replace("#recovery#", "#").replace("recovery#", "");
+    const hashParams = new URLSearchParams(cleanHash.substring(1));
     const accessToken = hashParams.get("access_token");
     const refreshToken = hashParams.get("refresh_token");
     const type = hashParams.get("type");
 
-    console.log("Hash:", window.location.hash);
+    console.log("Raw hash:", rawHash);
+    console.log("Clean hash:", cleanHash);
     console.log("Type:", type);
     console.log("Access token exists:", !!accessToken);
+
 
     if (type === "recovery" && accessToken) {
       supabase.auth.setSession({
