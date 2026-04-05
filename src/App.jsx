@@ -94,6 +94,10 @@ useEffect(() => {
     const refreshToken = hashParams.get("refresh_token");
     const type = hashParams.get("type");
 
+    console.log("Hash:", window.location.hash);
+    console.log("Type:", type);
+    console.log("Access token exists:", !!accessToken);
+
     if (type === "recovery" && accessToken) {
       supabase.auth.setSession({
         access_token: accessToken,
