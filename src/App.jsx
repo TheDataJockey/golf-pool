@@ -112,7 +112,7 @@ useEffect(() => {
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
-  
+
   useEffect(() => {
     if (session) fetchData();
   }, [session]);
@@ -205,24 +205,33 @@ if (isResetting) return (
           <input
             value={newPassword}
             onChange={e => setNewPassword(e.target.value)}
-            placeholder="New password"
+            placeholder="New password (min 6 characters)"
             type="password"
             style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
           <button
             onClick={async () => {
               if (!newPassword || newPassword.length < 6) {
                 alert("Password must be at least 6 characters.");
-return;
+                return;
+              }
+              // Get fresh session first
+              const { data: { session: currentSession } } = await supabase.auth.getSession();
+              console.log("Current session:", currentSession);
+              if (!currentSession) {
+                alert("Your reset link has expired. Please request a new one.");
+                setIsResetting(false);
+                return;
               }
               const { error } = await supabase.auth.updateUser({ password: newPassword });
-              console.log("Update result:", error);
               if (error) {
                 alert("Error updating password: " + error.message);
               } else {
                 setResetMessage("Password updated successfully! Redirecting...");
-                setIsResetting(false);
-                setNewPassword("");
-                setTimeout(() => window.location.href = "https://baggersgolf.com", 2000);
+                setTimeout(() => {
+                  setIsResetting(false);
+                  setNewPassword("");
+                  window.location.href = "https://baggersgolf.com";
+                }, 2000);
               }
             }}
             style={{ background: BILLS_RED, border: "none", borderRadius: 10, padding: "12px", color: BILLS_WHITE, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
@@ -232,7 +241,7 @@ return;
       </div>
     </div>
   );
-  if (!session) return (
+    if (!session) return (
     <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24, padding: 20 }}>
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400&display=swap" rel="stylesheet" />
       <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ width: isMobile ? 140 : 180 }} />
