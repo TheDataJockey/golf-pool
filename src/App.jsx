@@ -700,7 +700,6 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
       const myCurrentPick = myPicks.find(p => p.tournaments?.week_number === currentTournament.week_number);
       const myUsedGolfers = myPicks.map(p => p.golfer_name?.toLowerCase());
       const filteredField = field
-        .filter(p => p.player_name.toLowerCase().includes(searchPick.toLowerCase()))
         .filter(p => !myUsedGolfers.includes(p.player_name.toLowerCase()) || 
           p.player_name.toLowerCase() === myCurrentPick?.golfer_name?.toLowerCase());
       const myPriorPicks = myPicks
@@ -753,7 +752,7 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
                 {filteredField.length === 0 ? (
                   <div style={{ padding: 20, textAlign: "center", color: "#475569", fontSize: 13 }}>No golfers found</div>
                 ) : (
-                  filteredField.map((player, i) => {
+                  filteredField.filter(p => p.player_name.toLowerCase().includes(searchPick.toLowerCase())).map((player, i) => {
                     const isSelected = selectedPick === player.player_name;
                     return (
                       <div key={player.id}
