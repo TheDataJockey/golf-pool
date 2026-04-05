@@ -86,6 +86,9 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [fieldSearch, setFieldSearch] = useState("");
   const [fieldSort, setFieldSort] = useState("owgr");
+  const [showProfile, setShowProfile] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileData, setProfileData] = useState({});
 
 useEffect(() => {
     // Handle password recovery from URL hash
@@ -333,11 +336,18 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
       {m && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, background: BG2, borderBottom: `1px solid ${BORDER}` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px" }}>
-            <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ height: 40 }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ fontSize: 11, color: "#64748b" }}>{weekNums.length}/32 wks</div>
-              <button onClick={handleLogout} style={{ background: "rgba(198,12,48,0.15)", border: `1px solid rgba(198,12,48,0.3)`, borderRadius: 8, padding: "6px 12px", color: BILLS_RED, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Out</button>
-            </div>
+          <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ height: 40 }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 11, color: "#64748b" }}>{weekNums.length}/32 wks</div>
+            {loggedInBagger && (
+              <button onClick={() => { setProfileData({ ...loggedInBagger }); setShowProfile(true); }}
+                style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 20, padding: "4px 10px 4px 4px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                <Avatar bagger={loggedInBagger} size={24} i={baggers.findIndex(b => b.name === loggedInBagger.name)} />
+                <span style={{ fontSize: 12, color: BILLS_WHITE, fontWeight: 600 }}>{loggedInBagger.username || loggedInBagger.name}</span>
+              </button>
+            )}
+            <button onClick={handleLogout} style={{ background: "rgba(198,12,48,0.15)", border: `1px solid rgba(198,12,48,0.3)`, borderRadius: 8, padding: "6px 12px", color: BILLS_RED, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Out</button>
+          </div>
           </div>
           <div style={{ display: "flex", overflowX: "auto", borderTop: `1px solid ${BORDER}` }}>
             {NAV.map(item => (
@@ -354,9 +364,25 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
       {/* ── DESKTOP SIDEBAR ── */}
       {!m && (
         <div style={{ position: "fixed", left: 0, top: 0, bottom: 0, width: 210, background: BG2, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", padding: "24px 14px", zIndex: 10 }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 28, paddingBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
-            <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ width: 140 }} />
+<div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: `1px solid ${BORDER}` }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+            <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ width: 120 }} />
           </div>
+          {loggedInBagger && (
+            <button onClick={() => {
+              setProfileData({ ...loggedInBagger });
+              setShowProfile(true);
+            }}
+              style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 12, padding: "10px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+              <Avatar bagger={loggedInBagger} size={32} i={baggers.findIndex(b => b.name === loggedInBagger.name)} />
+              <div style={{ textAlign: "left", flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: BILLS_WHITE, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loggedInBagger.username || loggedInBagger.name}</div>
+                <div style={{ fontSize: 10, color: "#475569" }}>Edit Profile</div>
+              </div>
+              <div style={{ fontSize: 12, color: "#475569" }}>⚙️</div>
+            </button>
+          )}
+        </div>
           <nav style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
             {NAV.map(item => (
               <button key={item.id} onClick={() => setPage(item.id)}
@@ -1067,6 +1093,191 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
             })}
           </div>
         )}
+        {/* ── PROFILE MODAL ── */}
+      {showProfile && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowProfile(false); }}>
+          <div style={{ background: "#071128", border: `1px solid ${BORDER}`, borderRadius: 20, width: "100%", maxWidth: 560, maxHeight: "90vh", overflowY: "auto" }}>
+            
+            {/* Header */}
+            <div style={{ padding: "20px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#071128", zIndex: 1 }}>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, color: BILLS_WHITE }}>My Profile</div>
+              <button onClick={() => setShowProfile(false)} style={{ background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+
+            <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+
+              {/* Avatar section */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, background: "rgba(0,51,141,0.1)", border: `1px solid ${BORDER}`, borderRadius: 14, padding: 16 }}>
+                <div style={{ position: "relative" }}>
+                  <Avatar bagger={loggedInBagger} size={64} i={baggers.findIndex(b => b.name === loggedInBagger?.name)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 16, color: BILLS_WHITE, fontWeight: 700, marginBottom: 4 }}>{loggedInBagger?.name}</div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>{loggedInBagger?.email}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {["🏌️","🦬","⛳","🏆","🦅","💪","🎯","🔥","😎","🤠","👑","💰"].map(emoji => (
+                      <button key={emoji} onClick={async () => {
+                        await setEmojiAvatar(loggedInBagger.id, emoji);
+                        setProfileData(prev => ({ ...prev, avatar_url: emoji }));
+                      }}
+                        style={{ width: 32, height: 32, borderRadius: 8, background: loggedInBagger?.avatar_url === emoji ? "rgba(198,12,48,0.2)" : "rgba(255,255,255,0.05)", border: `1px solid ${loggedInBagger?.avatar_url === emoji ? "rgba(198,12,48,0.4)" : BORDER}`, cursor: "pointer", fontSize: 16 }}>
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 10 }}>
+                    <input type="file" accept="image/*" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file && loggedInBagger) await uploadAvatar(loggedInBagger.id, file);
+                    }} style={{ fontSize: 11, color: "#64748b" }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Basic info */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 600 }}>BASIC INFO</div>
+                {[
+                  { label: "Display Name", key: "username", placeholder: "How you appear in the app" },
+                  { label: "Email Address", key: "email", placeholder: "your@email.com" },
+                  { label: "Date of Birth", key: "dob", placeholder: "YYYY-MM-DD", type: "date" },
+                  { label: "GHIN Number", key: "ghin_number", placeholder: "Your handicap index number" },
+                ].map(field => (
+                  <div key={field.key}>
+                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>{field.label}</div>
+                    <input
+                      type={field.type || "text"}
+                      value={profileData[field.key] || ""}
+                      onChange={e => setProfileData(prev => ({ ...prev, [field.key]: e.target.value }))}
+                      placeholder={field.placeholder}
+                      style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 14px", color: BILLS_WHITE, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Equipment */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 600 }}>⛳ EQUIPMENT</div>
+                {[
+                  { label: "Driver", key: "driver" },
+                  { label: "Fairway Wood", key: "fairway_wood" },
+                  { label: "Irons", key: "irons" },
+                  { label: "Putter", key: "putter" },
+                  { label: "Golf Ball", key: "golf_ball" },
+                ].map(field => (
+                  <div key={field.key}>
+                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>{field.label}</div>
+                    <select
+                      value={profileData[field.key] || ""}
+                      onChange={e => setProfileData(prev => ({ ...prev, [field.key]: e.target.value }))}
+                      style={{ width: "100%", background: "#071128", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 14px", color: profileData[field.key] ? BILLS_WHITE : "#475569", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" }}>
+                      <option value="">Select brand...</option>
+                      {["Titleist","TaylorMade","Callaway","Ping","Cobra","Cleveland","Mizuno","Srixon","Wilson","PXG","Honma","Ben Hogan","Tour Edge","Adams","Bridgestone","Acushnet","Other"].map(brand => (
+                        <option key={brand} value={brand}>{brand}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {/* Apparel preferences */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 600 }}>👕 APPAREL PREFERENCES</div>
+                {[
+                  { label: "Shirt Brands", key: "shirt_brands", customKey: "custom_shirt" },
+                  { label: "Pant Brands", key: "pant_brands", customKey: "custom_pant" },
+                  { label: "Shoe Brands", key: "shoe_brands", customKey: "custom_shoe" },
+                  { label: "Weather Gear", key: "weather_gear_brands", customKey: "custom_weather" },
+                ].map(field => {
+                  const apparelBrands = ["Nike","Adidas","Under Armour","Puma","FootJoy","G/FORE","Malbon","Polo Ralph Lauren","Lacoste","Peter Millar","Lululemon","Patagonia","Galvin Green","Sun Ice","Oakley","Travis Mathew","Johnnie-O","Criquet","Greyson","Other"];
+                  const selected = profileData[field.key] || [];
+                  return (
+                    <div key={field.key}>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>{field.label}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: selected.includes("Other") ? 8 : 0 }}>
+                        {apparelBrands.map(brand => {
+                          const isSelected = selected.includes(brand);
+                          return (
+                            <button key={brand}
+                              onClick={() => {
+                                const next = isSelected
+                                  ? selected.filter(b => b !== brand)
+                                  : [...selected, brand];
+                                setProfileData(prev => ({ ...prev, [field.key]: next }));
+                              }}
+                              style={{ background: isSelected ? "rgba(198,12,48,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${isSelected ? "rgba(198,12,48,0.4)" : BORDER}`, borderRadius: 20, padding: "4px 12px", color: isSelected ? BILLS_RED : "#64748b", fontSize: 11, cursor: "pointer", fontWeight: isSelected ? 600 : 400 }}>
+                              {brand}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {selected.includes("Other") && (
+                        <input
+                          value={profileData[field.customKey] || ""}
+                          onChange={e => setProfileData(prev => ({ ...prev, [field.customKey]: e.target.value }))}
+                          placeholder="Enter brand name..."
+                          style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 12px", color: BILLS_WHITE, fontSize: 12, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Password change */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 600 }}>🔐 CHANGE PASSWORD</div>
+                <button onClick={async () => {
+                  const { error } = await supabase.auth.resetPasswordForEmail(loggedInBagger?.email, {
+                    redirectTo: "https://baggersgolf.com/#recovery",
+                  });
+                  if (!error) alert(`Password reset email sent to ${loggedInBagger?.email}!`);
+                }}
+                  style={{ background: "rgba(0,51,141,0.15)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 16px", color: "#94a3b8", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "left" }}>
+                  📧 Send Password Reset Email
+                </button>
+              </div>
+
+              {/* Save button */}
+              <button
+                onClick={async () => {
+                  setProfileSaving(true);
+                  const { error } = await supabase.from("baggers").update({
+                    username: profileData.username,
+                    email: profileData.email,
+                    dob: profileData.dob || null,
+                    ghin_number: profileData.ghin_number,
+                    driver: profileData.driver,
+                    fairway_wood: profileData.fairway_wood,
+                    irons: profileData.irons,
+                    putter: profileData.putter,
+                    golf_ball: profileData.golf_ball,
+                    shirt_brands: profileData.shirt_brands || [],
+                    pant_brands: profileData.pant_brands || [],
+                    shoe_brands: profileData.shoe_brands || [],
+                    weather_gear_brands: profileData.weather_gear_brands || [],
+                    custom_shirt: profileData.custom_shirt,
+                    custom_pant: profileData.custom_pant,
+                    custom_shoe: profileData.custom_shoe,
+                    custom_weather: profileData.custom_weather,
+                  }).eq("id", loggedInBagger?.id);
+                  
+                  if (!error) {
+                    await fetchData();
+                    setProfileSaving(false);
+                    setShowProfile(false);
+                  } else {
+                    alert("Error saving profile: " + error.message);
+                    setProfileSaving(false);
+                  }
+                }}
+                style={{ width: "100%", background: BILLS_RED, border: "none", borderRadius: 12, padding: "14px", color: BILLS_WHITE, fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }}>
+                {profileSaving ? "Saving..." : "Save Profile"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
