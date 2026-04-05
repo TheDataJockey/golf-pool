@@ -213,9 +213,8 @@ if (isResetting) return (
                 alert("Password must be at least 6 characters.");
                 return;
               }
-              const { error } = await supabase.auth.updateUser({ password: newPassword });
-              if (error) {
-                alert("Error updating password. Please try again.");
+const { error } = await supabase.auth.updateUser({ password: newPassword });
+console.log("Update result:", error);
               } else {
                 setResetMessage("Password updated successfully! Redirecting...");
                 setIsResetting(false);
