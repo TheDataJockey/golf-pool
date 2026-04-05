@@ -681,10 +681,19 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
 {page === "mypick" && (
   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
     {(() => {
+const now = new Date();
       const currentTournament = tournaments.find(t => {
         const s = new Date(t.start_date), e = new Date(t.end_date);
-        return s <= today && e >= today;
-      }) || tournaments.find(t => new Date(t.start_date) > today && !t.picks_locked);
+        return s <= now && e >= now;
+      }) || tournaments.find(t => {
+        if (!t.start_date) return false;
+        const s = new Date(t.start_date);
+        // Open for picks from Monday 6am ET of tournament week
+        const monday = new Date(s);
+        monday.setDate(s.getDate() - 3); // Monday before Thursday start
+        monday.setHours(11, 0, 0, 0); // 6am ET = 11am UTC
+        return now >= monday && now < s;
+      });
 
       if (!currentTournament) return (
         <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: 40, textAlign: "center" }}>
@@ -741,7 +750,7 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
               <div style={{ padding: "14px 16px", borderBottom: `1px solid ${BORDER}` }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                   <div style={{ width: 4, height: 16, background: BILLS_RED, borderRadius: 2 }} />
-                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: BILLS_WHITE }}>Golfers Available This Week</span>
+<span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: BILLS_WHITE }}>Week {currentTournament.week_number} — {currentTournament.name}</span>
                   <span style={{ fontSize: 11, color: "#475569", marginLeft: "auto" }}>{filteredField.length} available</span>
                 </div>
                 <input value={searchPick} onChange={e => setSearchPick(e.target.value)}
