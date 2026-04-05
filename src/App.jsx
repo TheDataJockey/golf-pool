@@ -202,29 +202,52 @@ if (isResetting) return (
           <div style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 8, padding: "10px 14px", color: "#22c55e", fontSize: 13, marginBottom: 16 }}>{resetMessage}</div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            value={newPassword}
-            onChange={e => setNewPassword(e.target.value)}
-            placeholder="New password (min 6 characters)"
-            type="password"
-            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
+          <div style={{ position: "relative" }}>
+            <input
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              placeholder="New password (min 6 characters)"
+              type={showPassword ? "text" : "password"}
+              style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", paddingRight: 44, color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" }} />
+            <button
+              onClick={() => setShowPassword(!showPassword)}
+              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: 16 }}>
+              {showPassword ? "🙈" : "👁️"}
+            </button>
+          </div>
           <button
             onClick={async () => {
               if (!newPassword || newPassword.length < 6) {
                 alert("Password must be at least 6 characters.");
                 return;
               }
-              // Get fresh session first
-              const { data: { session: currentSession } } = await supabase.auth.getSession();
-              console.log("Current session:", currentSession);
-              if (!currentSession) {
-                alert("Your reset link has expired. Please request a new one.");
-                setIsResetting(false);
-                return;
-              }
               const { error } = await supabase.auth.updateUser({ password: newPassword });
               if (error) {
-                alert("Error updating password: " + error.message);
+                console.error("Password update error:", error);
+                // Try exchanging the token from URL first
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const accessToken = hashParams.get("access_token");
+                const refreshToken = hashParams.get("refresh_token");
+                if (accessToken) {
+                  const { error: sessionError } = await supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken || "",
+                  });
+                  if (!sessionError) {
+                    const { error: retryError } = await supabase.auth.updateUser({ password: newPassword });
+                    if (!retryError) {
+                      setResetMessage("Password updated successfully! Redirecting...");
+                      setTimeout(() => {
+                        setIsResetting(false);
+                        setNewPassword("");
+                        window.location.href = "https://baggersgolf.com";
+                      }, 2000);
+                      return;
+                    }
+                  }
+                }
+                alert("Your reset link has expired. Please request a new one.");
+                setIsResetting(false);
               } else {
                 setResetMessage("Password updated successfully! Redirecting...");
                 setTimeout(() => {
