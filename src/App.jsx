@@ -101,6 +101,7 @@ useEffect(() => {
       setSession(session);
       if (_event === "PASSWORD_RECOVERY") {
         setIsResetting(true);
+        setSession(null);
       }
     });
 
@@ -211,10 +212,12 @@ if (isResetting) return (
             onClick={async () => {
               if (!newPassword || newPassword.length < 6) {
                 alert("Password must be at least 6 characters.");
-                return;
+return;
               }
-const { error } = await supabase.auth.updateUser({ password: newPassword });
-console.log("Update result:", error);
+              const { error } = await supabase.auth.updateUser({ password: newPassword });
+              console.log("Update result:", error);
+              if (error) {
+                alert("Error updating password: " + error.message);
               } else {
                 setResetMessage("Password updated successfully! Redirecting...");
                 setIsResetting(false);
@@ -245,11 +248,11 @@ console.log("Update result:", error);
         <div style={{ textAlign: "center", marginTop: 16 }}>
           <button onClick={async () => {
             if (!email) { alert("Enter your email address first then click Forgot Password."); return; }
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-              redirectTo: "https://baggersgolf.com",
+const { error } = await supabase.auth.resetPasswordForEmail(email, {
+              redirectTo: "https://baggersgolf.com/#recovery",
             });
-            if (error) { alert("Error sending reset email. Please try again."); }
-            else { alert(`Password reset email sent to ${email}!`); }
+            if (error) { alert("Error sending reset email: " + error.message); }
+            else { alert(`Password reset email sent to ${email}! Check your inbox and click the link within 10 minutes.`); }
           }}
             style={{ background: "transparent", border: "none", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textDecoration: "underline" }}>
             Forgot Password?
