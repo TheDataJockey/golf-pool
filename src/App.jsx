@@ -1,11 +1,8 @@
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "./supabase.js";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from "recharts";
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+
 
 const BILLS_BLUE = "#00338D";
 const BILLS_RED = "#C60C30";
@@ -57,7 +54,8 @@ const fmtFull = (n) => `$${Number(n).toLocaleString("en-US", { minimumFractionDi
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: "📊" },
   { id: "thisweek", label: "This Week", icon: "⛳" },
-  { id: "picks", label: "Picks", icon: "🏌️" },
+  { id: "mypick", label: "My Pick", icon: "🎯" },
+  { id: "picks", label: "Picks by Week", icon: "🏌️" },
   { id: "board", label: "Board", icon: "📌" },
   { id: "schedule", label: "Schedule", icon: "📅" },
   { id: "members", label: "Members", icon: "👥" },
@@ -472,7 +470,207 @@ async function uploadAvatar(baggerId, file) {
             </div>
           </div>
         )}
+{/* ── MY PICK ── */}
+{page === "mypick" && (
+  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    {(() => {
+      const currentTournament = tournaments.find(t => {
+        const s = new Date(t.start_date), e = new Date(t.end_date);
+        return s <= today && e >= today;
+      }) || tournaments.find(t => new Date(t.start_date) > today && !t.picks_locked);
 
+      if (!currentTournament) return (
+        <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: 40, textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⛳</div>
+          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: BILLS_WHITE }}>No upcoming tournament</div>
+          <div style={{ fontSize: 13, color: "#64748b", marginTop: 8 }}>Check back soon!</div>
+        </div>
+      );
+
+      const deadline = currentTournament.pick_deadline ? new Date(currentTournament.pick_deadline) : null;
+      const isLocked = currentTournament.picks_locked || (deadline && new Date() > deadline);
+      const myPicks = picks.filter(p => p.baggers?.name === loggedInBagger?.name);
+      const myCurrentPick = myPicks.find(p => p.tournaments?.week_number === currentTournament.week_number);
+      const myUsedGolfers = myPicks.map(p => p.golfer_name?.toLowerCase());
+      const filteredField = field
+        .filter(p => p.player_name.toLowerCase().includes(searchPick.toLowerCase()))
+        .filter(p => !myUsedGolfers.includes(p.player_name.toLowerCase()) || 
+          p.player_name.toLowerCase() === myCurrentPick?.golfer_name?.toLowerCase());
+      const myPriorPicks = myPicks
+        .filter(p => p.tournaments?.week_number !== currentTournament.week_number)
+        .sort((a, b) => b.tournaments?.week_number - a.tournaments?.week_number);
+
+      return (
+        <>
+          {/* Header banner */}
+          <div style={{ background: isLocked ? "rgba(255,255,255,0.04)" : "rgba(198,12,48,0.08)", border: `1px solid ${isLocked ? BORDER : "rgba(198,12,48,0.25)"}`, borderRadius: 14, padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {loggedInBagger && <Avatar bagger={loggedInBagger} size={36} i={baggers.findIndex(b => b.name === loggedInBagger.name)} />}
+              <div>
+                <div style={{ fontSize: 11, color: isLocked ? "#475569" : BILLS_RED, letterSpacing: "0.1em", fontWeight: 700 }}>{isLocked ? "🔒 PICKS LOCKED" : `🎯 WEEK ${currentTournament.week_number} — MAKE YOUR PICK`}</div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE }}>{currentTournament.name}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+              {deadline && (
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 10, color: "#475569", marginBottom: 2 }}>DEADLINE</div>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: isLocked ? "#475569" : BILLS_RED }}>
+                    {deadline.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+              )}
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 10, color: "#475569", marginBottom: 2 }}>PURSE</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#4a90d9", fontWeight: 700 }}>${(currentTournament.purse/1000000).toFixed(1)}M</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main two-column layout */}
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: m ? "wrap" : "nowrap" }}>
+
+            {/* LEFT — Golfer list */}
+            <div style={{ flex: m ? "1 1 100%" : "1 1 0", background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden", minWidth: 0 }}>
+              <div style={{ padding: "14px 16px", borderBottom: `1px solid ${BORDER}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <div style={{ width: 4, height: 16, background: BILLS_RED, borderRadius: 2 }} />
+                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: BILLS_WHITE }}>Golfers Available This Week</span>
+                  <span style={{ fontSize: 11, color: "#475569", marginLeft: "auto" }}>{filteredField.length} available</span>
+                </div>
+                <input value={searchPick} onChange={e => setSearchPick(e.target.value)}
+                  placeholder="Search golfers..."
+                  style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 12px", color: BILLS_WHITE, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div style={{ maxHeight: m ? 300 : 480, overflowY: "auto" }}>
+                {filteredField.length === 0 ? (
+                  <div style={{ padding: 20, textAlign: "center", color: "#475569", fontSize: 13 }}>No golfers found</div>
+                ) : (
+                  filteredField.map((player, i) => {
+                    const isSelected = selectedPick === player.player_name;
+                    return (
+                      <div key={player.id}
+                        style={{ display: "flex", alignItems: "center", padding: "10px 16px", borderBottom: `1px solid rgba(0,51,141,0.08)`, background: isSelected ? "rgba(198,12,48,0.12)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", borderLeft: isSelected ? `3px solid ${BILLS_RED}` : "3px solid transparent", cursor: isLocked ? "default" : "pointer" }}
+                        onClick={() => !isLocked && setSelectedPick(isSelected ? "" : player.player_name)}>
+                        <div style={{ width: 44, fontFamily: "'DM Mono', monospace", fontSize: 11, color: !player.owgr_rank ? "#334155" : player.owgr_rank <= 10 ? BILLS_RED : player.owgr_rank <= 50 ? "#4a90d9" : "#475569" }}>
+                          {player.owgr_rank ? `#${player.owgr_rank}` : "—"}
+                        </div>
+                        <div style={{ flex: 1, fontSize: 13, color: isSelected ? BILLS_WHITE : "#94a3b8", fontWeight: isSelected ? 600 : 400 }}>
+                          {player.player_name}
+                        </div>
+                        {isSelected && (
+                          <div style={{ fontSize: 13, color: BILLS_RED, fontWeight: 700 }}>✓</div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* ARROW — desktop only */}
+            {!m && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 180, flexShrink: 0 }}>
+                <div style={{ width: 0, height: 0, borderTop: "16px solid transparent", borderBottom: "16px solid transparent", borderLeft: `24px solid ${selectedPick ? BILLS_RED : BORDER}`, transition: "border-left-color 0.2s" }} />
+              </div>
+            )}
+
+            {/* RIGHT column */}
+            <div style={{ flex: m ? "1 1 100%" : "1 1 0", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+
+              {/* This week's pick */}
+              <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "14px 16px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 4, height: 16, background: BILLS_RED, borderRadius: 2 }} />
+                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: BILLS_WHITE }}>This Week's Pick</span>
+                </div>
+                <div style={{ padding: 16 }}>
+                  {selectedPick ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "rgba(198,12,48,0.1)", border: "1px solid rgba(198,12,48,0.25)", borderRadius: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: BILLS_RED, marginBottom: 2 }}>SELECTED</div>
+                        <div style={{ fontSize: 18, color: BILLS_WHITE, fontWeight: 700 }}>{selectedPick}</div>
+                      </div>
+                      {!isLocked && (
+                        <button onClick={() => setSelectedPick("")}
+                          style={{ background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 18 }}>✕</button>
+                      )}
+                    </div>
+                  ) : myCurrentPick ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: "#22c55e", marginBottom: 2 }}>CURRENT PICK</div>
+                        <div style={{ fontSize: 18, color: BILLS_WHITE, fontWeight: 700 }}>{myCurrentPick.golfer_name}</div>
+                        {!isLocked && <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Click a golfer to change</div>}
+                      </div>
+                      <div style={{ fontSize: 22 }}>✅</div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: "20px 0", textAlign: "center", color: "#475569", fontSize: 13 }}>
+                      {isLocked ? "No pick submitted" : "← Click a golfer to select"}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Prior picks */}
+              <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ padding: "14px 16px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 4, height: 16, background: "#334155", borderRadius: 2 }} />
+                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: "#64748b" }}>Prior Picks</span>
+                </div>
+                <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                  {myPriorPicks.length === 0 ? (
+                    <div style={{ padding: 20, textAlign: "center", color: "#334155", fontSize: 13 }}>No prior picks yet</div>
+                  ) : (
+                    myPriorPicks.map(pick => {
+                      const t = tournaments.find(t => t.week_number === pick.tournaments?.week_number);
+                      return (
+                        <div key={pick.id} style={{ display: "flex", alignItems: "center", padding: "10px 16px", borderBottom: `1px solid rgba(0,51,141,0.06)`, opacity: 0.5 }}>
+                          <div style={{ width: 40, fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#475569" }}>W{pick.tournaments?.week_number}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>{pick.golfer_name}</div>
+                            <div style={{ fontSize: 11, color: "#334155" }}>{t?.name || pick.tournaments?.name}</div>
+                          </div>
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: Number(pick.earnings||0) > 0 ? "#22c55e" : "#334155" }}>
+                            {Number(pick.earnings||0) > 0 ? `$${(Number(pick.earnings)/1000).toFixed(0)}K` : "—"}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Submit button */}
+          {!isLocked && (
+            <button onClick={async () => {
+              if (!selectedPick || !loggedInBagger || !currentTournament) return;
+              const { error } = await supabase.from("picks").upsert({
+                bagger_id: loggedInBagger.id,
+                tournament_id: currentTournament.id,
+                golfer_name: selectedPick,
+                earnings: 0,
+              }, { onConflict: "bagger_id,tournament_id" });
+              if (!error) {
+                await fetchData();
+                setSelectedPick("");
+              } else {
+                alert("Something went wrong. Please try again.");
+              }
+            }}
+              disabled={!selectedPick}
+              style={{ width: "100%", background: selectedPick ? BILLS_RED : "rgba(255,255,255,0.06)", border: "none", borderRadius: 12, padding: "16px", color: selectedPick ? BILLS_WHITE : "#475569", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, cursor: selectedPick ? "pointer" : "default", letterSpacing: "0.04em", transition: "background 0.2s" }}>
+              {selectedPick ? `⛳ Submit ${selectedPick} as My Week ${currentTournament.week_number} Pick →` : "Select a golfer from the list"}
+            </button>
+          )}
+        </>
+      );
+    })()}
+  </div>
+)}
         {/* ── PICKS ── */}
         {page === "picks" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
