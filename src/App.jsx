@@ -682,18 +682,29 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
     {(() => {
 const now = new Date();
-      const currentTournament = tournaments.find(t => {
-        const s = new Date(t.start_date), e = new Date(t.end_date);
-        return s <= now && e >= now;
-      }) || tournaments.find(t => {
-        if (!t.start_date) return false;
-        const s = new Date(t.start_date);
-        // Open for picks from Monday 6am ET of tournament week
-        const monday = new Date(s);
-        monday.setDate(s.getDate() - 3); // Monday before Thursday start
-        monday.setHours(11, 0, 0, 0); // 6am ET = 11am UTC
-        return now >= monday && now < s;
+      
+      // Find active tournament (currently in play)
+      const activeTournament = tournaments.find(t => {
+        if (!t.start_date || !t.end_date) return false;
+        const s = new Date(t.start_date + 'T00:00:00Z');
+        const e = new Date(t.end_date + 'T23:59:59Z');
+        return now >= s && now <= e;
       });
+
+      // Find next tournament where pick window is open (Mon 6am ET to Thu 8am ET)
+      const nextPickableTournament = tournaments.find(t => {
+        if (!t.start_date || !t.pick_deadline) return false;
+        const s = new Date(t.start_date);
+        const deadline = new Date(t.pick_deadline);
+        // Monday 6am ET = 11am UTC (3 days before Thursday start)
+        const monday = new Date(s);
+        monday.setDate(s.getDate() - 3);
+        monday.setHours(11, 0, 0, 0);
+        monday.setMinutes(0, 0, 0);
+        return now >= monday && now < deadline;
+      });
+
+      const currentTournament = activeTournament || nextPickableTournament;
 
       if (!currentTournament) return (
         <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: 40, textAlign: "center" }}>
