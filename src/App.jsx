@@ -147,6 +147,12 @@ useEffect(() => {
     if (session) fetchData();
   }, [session]);
 
+  useEffect(() => {
+    if (session && page === "picks") {
+      refreshLivePositions();
+    }
+  }, [session, page]);
+
   async function fetchData() {
     const [{ data: b }, { data: p }, { data: t }, { data: f }, { data: po }] = await Promise.all([
       supabase.from("baggers").select("*"),
@@ -170,7 +176,23 @@ useEffect(() => {
       }
     }
   }
-
+async function refreshLivePositions() {
+    const current = tournaments.find(t => {
+      const s = new Date(t.start_date), e = new Date(t.end_date);
+      e.setDate(e.getDate() + 1);
+      return new Date() >= s && new Date() <= e;
+    });
+    if (current) {
+      await fetch("https://iijfldracspwgezcwhtg.supabase.co/functions/v1/get-live-positions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+      await fetchData();
+    }
+  }
   async function handleLogin(e) {
     e.preventDefault();
     setAuthError("");
