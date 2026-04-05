@@ -78,6 +78,9 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [fieldSearch, setFieldSearch] = useState("");
@@ -94,7 +97,12 @@ useEffect(() => {
       setSession(session);
       setLoading(false);
     });
-    supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (_event === "PASSWORD_RECOVERY") {
+        setIsResetting(true);
+      }
+    });
 
     // Sign out when browser/tab is closed
     const handleUnload = () => {
@@ -182,7 +190,46 @@ async function uploadAvatar(baggerId, file) {
   if (loading) return (
     <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontFamily: "'DM Sans', sans-serif" }}>Loading...</div>
   );
-
+if (isResetting) return (
+    <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24, padding: 20 }}>
+      <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+      <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ width: 140 }} />
+      <div style={{ width: "100%", maxWidth: 360, background: "rgba(0,51,141,0.15)", border: `1px solid ${BORDER}`, borderRadius: 20, padding: 40 }}>
+        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: BILLS_WHITE, marginBottom: 4, textAlign: "center" }}>Set New Password</div>
+        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 28, textAlign: "center" }}>Enter your new password below</div>
+        {resetMessage && (
+          <div style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 8, padding: "10px 14px", color: "#22c55e", fontSize: 13, marginBottom: 16 }}>{resetMessage}</div>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <input
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            placeholder="New password"
+            type="password"
+            style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
+          <button
+            onClick={async () => {
+              if (!newPassword || newPassword.length < 6) {
+                alert("Password must be at least 6 characters.");
+                return;
+              }
+              const { error } = await supabase.auth.updateUser({ password: newPassword });
+              if (error) {
+                alert("Error updating password. Please try again.");
+              } else {
+                setResetMessage("Password updated successfully! Redirecting...");
+                setIsResetting(false);
+                setNewPassword("");
+                setTimeout(() => window.location.href = "https://baggersgolf.com", 2000);
+              }
+            }}
+            style={{ background: BILLS_RED, border: "none", borderRadius: 10, padding: "12px", color: BILLS_WHITE, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+            UPDATE PASSWORD
+          </button>
+        </div>
+      </div>
+    </div>
+  );
   if (!session) return (
     <div style={{ minHeight: "100vh", background: BG, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24, padding: 20 }}>
       <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400&display=swap" rel="stylesheet" />
