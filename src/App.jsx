@@ -194,8 +194,21 @@ async function uploadAvatar(baggerId, file) {
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
           <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" required style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
-          <button type="submit" style={{ background: BILLS_RED, border: "none", borderRadius: 10, padding: "12px", color: BILLS_WHITE, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>SIGN IN</button>
+<button type="submit" style={{ background: BILLS_RED, border: "none", borderRadius: 10, padding: "12px", color: BILLS_WHITE, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>SIGN IN</button>
         </form>
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <button onClick={async () => {
+            if (!email) { alert("Enter your email address first then click Forgot Password."); return; }
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+              redirectTo: "https://baggersgolf.com",
+            });
+            if (error) { alert("Error sending reset email. Please try again."); }
+            else { alert(`Password reset email sent to ${email}!`); }
+          }}
+            style={{ background: "transparent", border: "none", color: "#64748b", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textDecoration: "underline" }}>
+            Forgot Password?
+          </button>
+        </div>
       </div>
     </div>
   );
