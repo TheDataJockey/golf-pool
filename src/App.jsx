@@ -79,6 +79,7 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [isResetting, setIsResetting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [resetMessage, setResetMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -274,7 +275,14 @@ if (isResetting) return (
         {authError && <div style={{ background: "rgba(198,12,48,0.1)", border: "1px solid rgba(198,12,48,0.3)", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 16 }}>{authError}</div>}
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
-          <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type="password" required style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
+          <div style={{ position: "relative" }}>
+            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" type={showPassword ? "text" : "password"} required
+              style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", paddingRight: 44, color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" }} />
+            <button onClick={() => setShowPassword(!showPassword)} type="button"
+              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: 16 }}>
+              {showPassword ? "🙈" : "👁️"}
+            </button>
+          </div>
 <button type="submit" style={{ background: BILLS_RED, border: "none", borderRadius: 10, padding: "12px", color: BILLS_WHITE, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>SIGN IN</button>
         </form>
         <div style={{ textAlign: "center", marginTop: 16 }}>
