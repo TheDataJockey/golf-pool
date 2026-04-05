@@ -236,8 +236,7 @@ if (isResetting) return (
               placeholder="New password (min 6 characters)"
               type={showPassword ? "text" : "password"}
               style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px 16px", paddingRight: 44, color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" }} />
-            <button
-              onClick={() => setShowPassword(!showPassword)}
+            <button onClick={() => setShowPassword(!showPassword)} type="button"
               style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: 16 }}>
               {showPassword ? "🙈" : "👁️"}
             </button>
@@ -250,31 +249,11 @@ if (isResetting) return (
               }
               const { error } = await supabase.auth.updateUser({ password: newPassword });
               if (error) {
-                console.error("Password update error:", error);
-                // Try exchanging the token from URL first
-                const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                const accessToken = hashParams.get("access_token");
-                const refreshToken = hashParams.get("refresh_token");
-                if (accessToken) {
-                  const { error: sessionError } = await supabase.auth.setSession({
-                    access_token: accessToken,
-                    refresh_token: refreshToken || "",
-                  });
-                  if (!sessionError) {
-                    const { error: retryError } = await supabase.auth.updateUser({ password: newPassword });
-                    if (!retryError) {
-                      setResetMessage("Password updated successfully! Redirecting...");
-                      setTimeout(() => {
-                        setIsResetting(false);
-                        setNewPassword("");
-                        window.location.href = "https://baggersgolf.com";
-                      }, 2000);
-                      return;
-                    }
-                  }
+                if (error.message.includes("different from the old password")) {
+                  alert("Please choose a different password than your current one.");
+                } else {
+                  alert("Error updating password: " + error.message);
                 }
-                alert("Your reset link has expired. Please request a new one.");
-                setIsResetting(false);
               } else {
                 setResetMessage("Password updated successfully! Redirecting...");
                 setTimeout(() => {
