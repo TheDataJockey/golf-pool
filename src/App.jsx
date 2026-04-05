@@ -89,6 +89,8 @@ export default function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileData, setProfileData] = useState({});
+  const [searchPick, setSearchPick] = useState("");
+  const [selectedPick, setSelectedPick] = useState("");
 
 useEffect(() => {
     // Handle password recovery from URL hash
