@@ -879,7 +879,16 @@ const { error } = await supabase.auth.resetPasswordForEmail(email, {
                             <div style={{ width: m ? 50 : 60, fontSize: 13, color: BILLS_WHITE, fontWeight: 500 }}>{pick.baggers?.name}</div>
                             <div style={{ flex: 1, fontSize: m ? 12 : 13, color: "#64748b" }}>{pick.golfer_name}</div>
                             <div style={{ fontFamily: "'DM Mono', monospace", fontSize: m ? 11 : 13, color: Number(pick.earnings||0) > 500000 ? BILLS_RED : "#64748b" }}>
-                              {m ? fmt(Number(pick.earnings||0)) : fmtFull(Number(pick.earnings||0))}
+<div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: m ? 11 : 13, color: Number(pick.earnings||0) > 500000 ? BILLS_RED : "#64748b" }}>
+                                  {m ? fmt(Number(pick.earnings||0)) : fmtFull(Number(pick.earnings||0))}
+                                </div>
+                                {pick.finish_position && (
+                                  <div style={{ fontSize: 10, color: pick.finish_position <= 10 ? "#22c55e" : "#475569", fontFamily: "'DM Mono', monospace" }}>
+                                    {pick.finish_position === 1 ? "🏆 1st" : `T${pick.finish_position}`}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
