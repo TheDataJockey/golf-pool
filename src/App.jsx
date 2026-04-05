@@ -101,11 +101,9 @@ useEffect(() => {
       }).then(({ error }) => {
         if (!error) {
           setIsResetting(true);
-          setLoading(false);
-        } else {
-          console.error("Session error:", error);
-          setLoading(false);
+          setSession(null);
         }
+        setLoading(false);
       });
       return;
     }
@@ -116,10 +114,14 @@ useEffect(() => {
     });
 
     supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
       if (_event === "PASSWORD_RECOVERY") {
         setIsResetting(true);
         setSession(null);
+        setLoading(false);
+        return;
+      }
+      if (!isResetting) {
+        setSession(session);
       }
     });
 
