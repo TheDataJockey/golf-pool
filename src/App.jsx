@@ -80,6 +80,8 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [fieldSearch, setFieldSearch] = useState("");
+  const [fieldSort, setFieldSort] = useState("owgr");
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -391,86 +393,134 @@ async function uploadAvatar(baggerId, file) {
           </div>
         )}
 
-        {/* ── THIS WEEK ── */}
-        {page === "thisweek" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {(() => {
-              const current = tournaments.find(t => {
-                const s = new Date(t.start_date), e = new Date(t.end_date);
-                return s <= today && e >= today;
-              });
-              return current ? (
-                <div style={{ background: "rgba(198,12,48,0.08)", border: "1px solid rgba(198,12,48,0.25)", borderRadius: 16, padding: m ? "16px" : "20px 28px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 700, marginBottom: 6 }}>🔴 LIVE THIS WEEK</div>
-                      <div style={{ fontFamily: "'Playfair Display', serif", fontSize: m ? 18 : 22, color: BILLS_WHITE, marginBottom: 4 }}>{current.name}</div>
-                      <div style={{ fontSize: 12, color: "#64748b" }}>{current.course}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 20 }}>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 11, color: "#475569", marginBottom: 4 }}>PURSE</div>
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: "#4a90d9", fontWeight: 700 }}>${(current.purse/1000000).toFixed(1)}M</div>
-                      </div>
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 11, color: "#475569", marginBottom: 4 }}>FIELD</div>
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: BILLS_WHITE, fontWeight: 700 }}>{field.length}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: "20px" }}>
-                  <div style={{ fontSize: 13, color: "#64748b" }}>No tournament currently in progress.</div>
-                </div>
-              );
-            })()}
-
-            <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
-                  <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: BILLS_WHITE }}>This Week's Field</span>
-                </div>
-                <div style={{ fontSize: 11, color: "#475569" }}>{field.length} players</div>
+        {/* ── THIS WEEK ── */} 
+{/* ── THIS WEEK ── */}
+{page === "thisweek" && (
+  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    {(() => {
+      const current = tournaments.find(t => {
+        const s = new Date(t.start_date), e = new Date(t.end_date);
+        return s <= today && e >= today;
+      });
+      return current ? (
+        <div style={{ background: "rgba(198,12,48,0.08)", border: "1px solid rgba(198,12,48,0.25)", borderRadius: 16, padding: m ? "16px" : "20px 28px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 700, marginBottom: 6 }}>🔴 LIVE THIS WEEK</div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: m ? 18 : 22, color: BILLS_WHITE, marginBottom: 4 }}>{current.name}</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{current.course}</div>
+            </div>
+            <div style={{ display: "flex", gap: 20 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "#475569", marginBottom: 4 }}>PURSE</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: "#4a90d9", fontWeight: 700 }}>${(current.purse/1000000).toFixed(1)}M</div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 70px" : "60px 1fr 80px 100px", gap: m ? 8 : 16, padding: "10px 16px", borderBottom: `1px solid rgba(0,51,141,0.15)` }}>
-                {(m ? ["OWGR", "PLAYER", "STATUS"] : ["OWGR", "PLAYER", "STATUS", "PICKED BY"]).map(h => (
-                  <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: "0.08em", fontWeight: 600 }}>{h}</div>
-                ))}
-              </div>
-              <div style={{ maxHeight: m ? 500 : 600, overflowY: "auto" }}>
-                {field.map((player, i) => {
-                  const currentWeek = tournaments.find(t => {
-                    const s = new Date(t.start_date), e = new Date(t.end_date);
-                    return s <= today && e >= today;
-                  });
-                  const pickedBy = currentWeek ? picks
-                    .filter(p => p.tournaments?.week_number === currentWeek.week_number && p.golfer_name?.toLowerCase() === player.player_name?.toLowerCase())
-                    .map(p => p.baggers?.name).join(", ") : "";
-                  return (
-                    <div key={player.id} style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 70px" : "60px 1fr 80px 100px", gap: m ? 8 : 16, padding: m ? "8px 16px" : "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.06)`, background: pickedBy ? "rgba(198,12,48,0.05)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", alignItems: "center" }}>
-                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: m ? 11 : 12, color: player.owgr_rank <= 10 ? BILLS_RED : player.owgr_rank <= 50 ? "#4a90d9" : "#475569" }}>
-                        {player.owgr_rank ? `#${player.owgr_rank}` : "—"}
-                      </div>
-                      <div style={{ fontSize: m ? 12 : 13, color: pickedBy ? BILLS_WHITE : "#94a3b8", fontWeight: pickedBy ? 600 : 400 }}>
-                        {player.player_name}{player.amateur && <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(A)</span>}
-                      </div>
-                      <div style={{ fontSize: 10 }}>
-                        {player.owgr_rank <= 10 ? <span style={{ color: BILLS_RED, fontWeight: 600 }}>Top 10</span>
-                        : player.owgr_rank <= 50 ? <span style={{ color: "#4a90d9" }}>Top 50</span>
-                        : player.owgr_rank <= 100 ? <span style={{ color: "#64748b" }}>Top 100</span>
-                        : <span style={{ color: "#334155" }}>Field</span>}
-                      </div>
-                      {!m && <div style={{ fontSize: 12, color: BILLS_RED, fontWeight: 600 }}>{pickedBy || ""}</div>}
-                    </div>
-                  );
-                })}
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "#475569", marginBottom: 4 }}>FIELD</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: BILLS_WHITE, fontWeight: 700 }}>{field.length}</div>
               </div>
             </div>
           </div>
-        )}
-{/* ── MY PICK ── */}
+        </div>
+      ) : (
+        <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, padding: "20px" }}>
+          <div style={{ fontSize: 13, color: "#64748b" }}>No tournament currently in progress.</div>
+        </div>
+      );
+    })()}
+
+    <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+      {/* Header with search and sort */}
+      <div style={{ padding: "14px 16px", borderBottom: `1px solid ${BORDER}` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: BILLS_WHITE }}>This Week's Field</span>
+          </div>
+          <div style={{ fontSize: 11, color: "#475569" }}>{field.length} players</div>
+        </div>
+        <input value={fieldSearch} onChange={e => setFieldSearch(e.target.value)}
+          placeholder="Search golfers..."
+          style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 12px", color: BILLS_WHITE, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", marginBottom: 10, boxSizing: "border-box" }} />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {[
+            { id: "owgr", label: "World Ranking" },
+            { id: "name", label: "Name" },
+            { id: "status", label: "Status" },
+            { id: "picked", label: "Picked By" },
+          ].map(s => (
+            <button key={s.id} onClick={() => setFieldSort(s.id)}
+              style={{ background: fieldSort === s.id ? "rgba(198,12,48,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${fieldSort === s.id ? "rgba(198,12,48,0.4)" : BORDER}`, borderRadius: 8, padding: "5px 12px", color: fieldSort === s.id ? BILLS_RED : "#64748b", fontSize: 11, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: fieldSort === s.id ? 600 : 400 }}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Column headers */}
+      <div style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 70px" : "60px 1fr 80px 100px", gap: m ? 8 : 16, padding: "10px 16px", borderBottom: `1px solid rgba(0,51,141,0.15)` }}>
+        {(m ? ["OWGR", "PLAYER", "STATUS"] : ["OWGR", "PLAYER", "STATUS", "PICKED BY"]).map(h => (
+          <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: "0.08em", fontWeight: 600 }}>{h}</div>
+        ))}
+      </div>
+
+      {/* Player rows */}
+      <div style={{ maxHeight: m ? 500 : 600, overflowY: "auto" }}>
+        {(() => {
+          const currentWeek = tournaments.find(t => {
+            const s = new Date(t.start_date), e = new Date(t.end_date);
+            return s <= today && e >= today;
+          });
+
+          let displayField = field.filter(p =>
+            p.player_name.toLowerCase().includes(fieldSearch.toLowerCase())
+          ).map(player => {
+            const pickedBy = currentWeek ? picks
+              .filter(p => p.tournaments?.week_number === currentWeek.week_number &&
+                p.golfer_name?.toLowerCase() === player.player_name?.toLowerCase())
+              .map(p => p.baggers?.name).join(", ") : "";
+            return { ...player, pickedBy };
+          });
+
+          if (fieldSort === "name") {
+            displayField.sort((a, b) => a.player_name.localeCompare(b.player_name));
+          } else if (fieldSort === "status") {
+            displayField.sort((a, b) => (a.owgr_rank || 999) - (b.owgr_rank || 999));
+          } else if (fieldSort === "picked") {
+            displayField.sort((a, b) => {
+              if (a.pickedBy && !b.pickedBy) return -1;
+              if (!a.pickedBy && b.pickedBy) return 1;
+              return 0;
+            });
+          }
+
+          if (displayField.length === 0) return (
+            <div style={{ padding: 40, textAlign: "center", color: "#475569", fontSize: 14 }}>No golfers found</div>
+          );
+
+          return displayField.map((player, i) => (
+            <div key={player.id} style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 70px" : "60px 1fr 80px 100px", gap: m ? 8 : 16, padding: m ? "8px 16px" : "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.06)`, background: player.pickedBy ? "rgba(198,12,48,0.05)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", alignItems: "center" }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: m ? 11 : 12, color: !player.owgr_rank ? "#334155" : player.owgr_rank <= 10 ? BILLS_RED : player.owgr_rank <= 50 ? "#4a90d9" : "#475569" }}>
+                {player.owgr_rank ? `#${player.owgr_rank}` : "—"}
+              </div>
+              <div style={{ fontSize: m ? 12 : 13, color: player.pickedBy ? BILLS_WHITE : "#94a3b8", fontWeight: player.pickedBy ? 600 : 400 }}>
+                {player.player_name}{player.amateur && <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(A)</span>}
+              </div>
+              <div style={{ fontSize: 10 }}>
+                {!player.owgr_rank ? <span style={{ color: "#334155" }}>Field</span>
+                : player.owgr_rank <= 10 ? <span style={{ color: BILLS_RED, fontWeight: 600 }}>Top 10</span>
+                : player.owgr_rank <= 50 ? <span style={{ color: "#4a90d9" }}>Top 50</span>
+                : player.owgr_rank <= 100 ? <span style={{ color: "#64748b" }}>Top 100</span>
+                : <span style={{ color: "#334155" }}>Field</span>}
+              </div>
+              {!m && <div style={{ fontSize: 12, color: BILLS_RED, fontWeight: 600 }}>{player.pickedBy || ""}</div>}
+            </div>
+          ));
+        })()}
+      </div>
+    </div>
+  </div>
+)}{/* ── MY PICK ── */}
 {page === "mypick" && (
   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
     {(() => {
