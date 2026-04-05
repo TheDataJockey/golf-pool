@@ -13,7 +13,6 @@ const BORDER = "rgba(0,51,141,0.25)";
 const COLORS = ["#C60C30","#00338D","#E8193C","#1A4FAD","#FF6B81","#4A7FD4","#FFFFFF"];
 
 const PREVIOUS_WINNERS = {
-const PREVIOUS_WINNERS = {
   'WM Phoenix Open': 'Chris Gotterup',
   'AT&T Pebble Beach Pro-Am': 'Collin Morikawa',
   'Cognizant Classic': 'Nico Echavarria',
