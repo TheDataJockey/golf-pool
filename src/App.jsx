@@ -86,17 +86,18 @@ export default function App() {
   const [fieldSearch, setFieldSearch] = useState("");
   const [fieldSort, setFieldSort] = useState("owgr");
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
 useEffect(() => {
+    // Check for password recovery in URL hash
+    const hash = window.location.hash;
+    if (hash && hash.includes("type=recovery")) {
+      setIsResetting(true);
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
+
     supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (_event === "PASSWORD_RECOVERY") {
@@ -105,14 +106,13 @@ useEffect(() => {
       }
     });
 
-    // Sign out when browser/tab is closed
     const handleUnload = () => {
       supabase.auth.signOut();
     };
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
-
+  
   useEffect(() => {
     if (session) fetchData();
   }, [session]);
