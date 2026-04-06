@@ -105,6 +105,9 @@ export default function App() {
   const [profileData, setProfileData] = useState({});
   const [searchPick, setSearchPick] = useState("");
   const [selectedPick, setSelectedPick] = useState("");
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionMatches, setMentionMatches] = useState([]);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -874,8 +877,58 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <textarea value={newPost} onChange={e => setNewPost(e.target.value)} placeholder="Trash talk welcome... 🏌️" rows={3}
-                style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 14px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+<div style={{ position: "relative" }}>
+  <textarea value={newPost} onChange={e => {
+    const val = e.target.value;
+    setNewPost(val);
+    // Detect @ mention
+    const lastAtIndex = val.lastIndexOf("@");
+    if (lastAtIndex !== -1) {
+      const query = val.slice(lastAtIndex + 1).toLowerCase();
+      const matches = baggers.filter(b => b.name.toLowerCase().startsWith(query) && b.name !== currentBagger);
+      setMentionQuery(query);
+      setMentionMatches(matches);
+      setShowMentionDropdown(matches.length > 0);
+    } else {
+      setShowMentionDropdown(false);
+    }
+  }} placeholder="Trash talk welcome... type @ to tag someone 🏌️" rows={3}
+    style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 14px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+
+  {/* Mention dropdown */}
+  {showMentionDropdown && (
+    <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: BG2, border: `1px solid ${BORDER}`, borderRadius: 10, zIndex: 100, overflow: "hidden", marginTop: 4 }}>
+      {mentionMatches.map(b => (
+        <div key={b.name} onClick={async () => {
+          // Replace the @query with @Name in the post
+          const lastAtIndex = newPost.lastIndexOf("@");
+          const newText = newPost.slice(0, lastAtIndex) + `@${b.name} `;
+          setNewPost(newText);
+          setShowMentionDropdown(false);
+          // Send notification immediately
+          await fetch("https://iijfldracspwgezcwhtg.supabase.co/functions/v1/send-tag-notification", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              tagged_name: b.name,
+              posted_by: currentBagger,
+              content: newText,
+            }),
+          });
+        }}
+          style={{ padding: "10px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, borderBottom: `1px solid ${BORDER}` }}
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(198,12,48,0.1)"}
+          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+          <Avatar bagger={b} size={24} i={baggers.findIndex(x => x.name === b.name)} />
+          <span style={{ fontSize: 13, color: BILLS_WHITE }}>{b.name}</span>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, color: "#64748b" }}>
                   📷 Add Photo
