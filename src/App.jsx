@@ -1019,7 +1019,6 @@ const now = new Date();
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <div style={{ fontSize: 11, color: "#475569" }}>{currentBagger ? `As ${currentBagger}` : "Pick your name"}</div>
                 <button onClick={async () => {
-onClick={async () => {
                   if (!newPost.trim() || !currentBagger) return;
                   let imageUrl = null;
                   if (postImage) {
