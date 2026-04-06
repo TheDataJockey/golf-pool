@@ -238,13 +238,13 @@ async function uploadAvatar(baggerId, file) {
     setUploadingPost(true);
     const ext = file.name.split(".").pop();
     const path = `public/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-    const { error } = await supabase.storage.from("post-images").upload(path, file, { upsert: false });
+    const { error } = await supabase.storage.from("Post-images").upload(path, file, { upsert: false });
     if (error) {
       console.error("Post image upload error:", error);
       setUploadingPost(false);
       return null;
     }
-    const { data: { publicUrl } } = supabase.storage.from("post-images").getPublicUrl(path);
+    const { data: { publicUrl } } = supabase.storage.from("Post-images").getPublicUrl(path);
     setUploadingPost(false);
     return publicUrl;
   }
