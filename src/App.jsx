@@ -70,6 +70,10 @@ export default function App() {
   const [field, setField] = useState([]);
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState("");
+  const [postImage, setPostImage] = useState(null);
+  const [postImagePreview, setPostImagePreview] = useState(null);
+  const [uploadingPost, setUploadingPost] = useState(false);
+  const [expandedImage, setExpandedImage] = useState(null);
   const [postCategory, setPostCategory] = useState("banter");
   const [currentBagger, setCurrentBagger] = useState(null);
   const [loggedInBagger, setLoggedInBagger] = useState(null);
@@ -230,6 +234,20 @@ async function uploadAvatar(baggerId, file) {
     setShowAvatarPicker(null);
   }
 
+  async function uploadPostImage(file) {
+    setUploadingPost(true);
+    const ext = file.name.split(".").pop();
+    const path = `public/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+    const { error } = await supabase.storage.from("post-images").upload(path, file, { upsert: false });
+    if (error) {
+      console.error("Post image upload error:", error);
+      setUploadingPost(false);
+      return null;
+    }
+    const { data: { publicUrl } } = supabase.storage.from("post-images").getPublicUrl(path);
+    setUploadingPost(false);
+    return publicUrl;
+  }
   function Avatar({ bagger, size = 40, i = 0 }) {
     const isEmoji = bagger?.avatar_url && !bagger.avatar_url.startsWith("http");
     const isPhoto = bagger?.avatar_url && bagger.avatar_url.startsWith("http");
@@ -968,15 +986,58 @@ const now = new Date();
                   </button>
                 ))}
               </div>
-              <textarea value={newPost} onChange={e => setNewPost(e.target.value)}
+<textarea value={newPost} onChange={e => setNewPost(e.target.value)}
                 placeholder="Trash talk welcome... 🏌️" rows={3}
                 style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 14px", color: BILLS_WHITE, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+              
+              {/* Photo upload */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, color: "#64748b" }}>
+                  📷 Add Photo
+                  <input type="file" accept="image/*" capture="environment" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPostImage(file);
+                      setPostImagePreview(URL.createObjectURL(file));
+                    }
+                  }} style={{ display: "none" }} />
+                </label>
+                {uploadingPost && <span style={{ fontSize: 12, color: "#f59e0b" }}>Uploading...</span>}
+              </div>
+
+              {/* Image preview */}
+              {postImagePreview && (
+                <div style={{ marginTop: 10, position: "relative", display: "inline-block" }}>
+                  <img src={postImagePreview} alt="Preview" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 10, border: `1px solid ${BORDER}` }} />
+                  <button onClick={() => { setPostImage(null); setPostImagePreview(null); }}
+                    style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.6)", border: "none", borderRadius: "50%", width: 24, height: 24, color: "white", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    ✕
+                  </button>
+                </div>
+              )}
+              
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
                 <div style={{ fontSize: 11, color: "#475569" }}>{currentBagger ? `As ${currentBagger}` : "Pick your name"}</div>
                 <button onClick={async () => {
+onClick={async () => {
                   if (!newPost.trim() || !currentBagger) return;
-                  const { data } = await supabase.from("posts").insert({ bagger_name: currentBagger, content: newPost.trim(), category: postCategory, reactions: {} }).select();
-                  if (data) { setPosts(prev => [data[0], ...prev]); setNewPost(""); }
+                  let imageUrl = null;
+                  if (postImage) {
+                    imageUrl = await uploadPostImage(postImage);
+                  }
+                  const { data } = await supabase.from("posts").insert({ 
+                    bagger_name: currentBagger, 
+                    content: newPost.trim(), 
+                    category: postCategory, 
+                    reactions: {},
+                    image_url: imageUrl,
+                  }).select();
+                  if (data) { 
+                    setPosts(prev => [data[0], ...prev]); 
+                    setNewPost(""); 
+                    setPostImage(null);
+                    setPostImagePreview(null);
+                  }
                 }}
                   style={{ background: currentBagger && newPost.trim() ? BILLS_RED : "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, padding: "9px 20px", color: currentBagger && newPost.trim() ? BILLS_WHITE : "#475569", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   Post 📌
@@ -1009,6 +1070,17 @@ const now = new Date();
                       style={{ background: "transparent", border: "none", color: "#334155", cursor: "pointer", fontSize: 14 }}>✕</button>
                   </div>
                   <p style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.6, margin: "0 0 12px" }}>{post.content}</p>
+                  {post.image_url && (
+                    <div style={{ marginBottom: 12 }}>
+                      <img 
+                        src={post.image_url} 
+                        alt="Post image" 
+                        onClick={() => setExpandedImage(post.image_url)}
+                        style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 10, border: `1px solid ${BORDER}`, cursor: "pointer", objectFit: "cover" }} 
+                      />
+                      <div style={{ fontSize: 10, color: "#475569", marginTop: 4 }}>Click to expand</div>
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     {["🔥","😂","💀","👏","🏌️","⛳"].map(emoji => {
                       const count = post.reactions?.[emoji] || 0;
@@ -1027,6 +1099,17 @@ const now = new Date();
                 </div>
               );
             })}
+            {/* ── IMAGE LIGHTBOX ── */}
+      {expandedImage && (
+        <div onClick={() => setExpandedImage(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, cursor: "pointer" }}>
+          <img src={expandedImage} alt="Expanded" style={{ maxWidth: "100%", maxHeight: "90vh", borderRadius: 12, objectFit: "contain" }} />
+          <button onClick={() => setExpandedImage(null)}
+            style={{ position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: 40, height: 40, color: "white", cursor: "pointer", fontSize: 20 }}>
+            ✕
+          </button>
+        </div>
+      )}
           </div>
         )}
 
