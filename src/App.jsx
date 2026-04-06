@@ -874,12 +874,15 @@ const now = new Date();
           {!isLocked && (
             <button onClick={async () => {
               if (!selectedPick || !loggedInBagger || !currentTournament) return;
-              const { error } = await supabase.from("picks").upsert({
-                bagger_id: loggedInBagger.id,
-                tournament_id: currentTournament.id,
-                golfer_name: selectedPick,
-                earnings: 0,
-              }, { onConflict: "bagger_id,tournament_id" });
+                // Look up datagolf_name from weekly_field
+                const fieldPlayer = field.find(p => p.player_name === selectedPick);
+                const { error } = await supabase.from("picks").upsert({
+                  bagger_id: loggedInBagger.id,
+                  tournament_id: currentTournament.id,
+                  golfer_name: selectedPick,
+                  datagolf_name: fieldPlayer?.datagolf_name || null,
+                  earnings: 0,
+                }, { onConflict: "bagger_id,tournament_id" });
               if (!error) {
                 await fetchData();
                 setSelectedPick("");
