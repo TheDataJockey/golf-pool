@@ -1221,7 +1221,7 @@ async function fetchData() {
 
                   const golferScores = Object.values(latestByGolfer);
                   // Sort by net points, take best 4
-                  const sorted = golferScores.sort((a: any, b: any) => a.net_points - b.net_points);
+                  const sorted = golferScores.sort((a, b) => a.net_points - b.net_points);
                   const best4 = sorted.slice(0, 4);
                   const total = best4.reduce((sum: number, s: any) => sum + (s.net_points || 0), 0);
 
