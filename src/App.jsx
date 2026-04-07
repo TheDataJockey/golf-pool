@@ -1223,7 +1223,7 @@ async function fetchData() {
                   // Sort by net points, take best 4
                   const sorted = golferScores.sort((a, b) => a.net_points - b.net_points);
                   const best4 = sorted.slice(0, 4);
-                  const total = best4.reduce((sum: number, s: any) => sum + (s.net_points || 0), 0);
+                  const total = best4.reduce((sum, s) => sum + (s.net_points || 0), 0);
 
                   return { member, golferScores, best4, total };
                 });
