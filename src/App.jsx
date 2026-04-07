@@ -1469,17 +1469,14 @@ const memberPicks = contestPicks.filter(p =>
                           .filter(p => p.player_name.toLowerCase().includes(searchPick.toLowerCase()))
                           .filter(p => !myContestPicks.some(cp => cp.golfer_name === p.player_name))
                           .map((player, i) => (
-                            <div key={player.id} onClick={async () => {
-                              if (myContestPicks.length >= 5) return;
-                              await supabase.from("contest_picks").insert({
-                                member_id: myMember.id,
-                                tournament_id: activeTournament.id,
-                                golfer_name: player.player_name,
-                                datagolf_name: player.datagolf_name,
-                              });
-                              await fetchData();
-                              setSearchPick("");
-                            }}
+                              <div key={player.id} onClick={() => {
+                                if (totalPicks >= 5) return;
+                                setContestPickStaging(prev => [...prev, {
+                                  golfer_name: player.player_name,
+                                  datagolf_name: player.datagolf_name,
+                                }]);
+                                setSearchPick("");
+                                }}
                               style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderBottom: `1px solid rgba(0,51,141,0.06)`, cursor: "pointer", background: i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent" }}
                               onMouseEnter={e => e.currentTarget.style.background = "rgba(198,12,48,0.08)"}
                               onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent"}>
