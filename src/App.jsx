@@ -1240,7 +1240,7 @@ async function fetchData() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, color: BILLS_WHITE, fontWeight: i === 0 ? 600 : 400 }}>{s.member.name}</div>
                       <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
-                        {s.best4.map((g: any) => g.golfer_name).join(", ") || "No picks"}
+                        {s.best4.map(g => g.golfer_name).join(", ") || "No picks"}
                       </div>
                     </div>
                     <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: i === 0 ? BILLS_RED : "#64748b", fontWeight: 700 }}>
