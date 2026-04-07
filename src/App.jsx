@@ -1212,7 +1212,7 @@ async function fetchData() {
                   );
 
                   // Get latest score per golfer
-                  const latestByGolfer: Record<string, any> = {};
+                  const latestByGolfer = {};
                   memberScores.forEach(s => {
                     if (!latestByGolfer[s.golfer_name] || s.round_date > latestByGolfer[s.golfer_name].round_date) {
                       latestByGolfer[s.golfer_name] = s;
@@ -1283,7 +1283,7 @@ async function fetchData() {
                   );
 
                   // Get latest score per golfer
-                  const latestByGolfer: Record<string, any> = {};
+                  const latestByGolfer = {};
                   memberScores.forEach(s => {
                     if (!latestByGolfer[s.golfer_name] || s.round_date > latestByGolfer[s.golfer_name].round_date) {
                       latestByGolfer[s.golfer_name] = s;
