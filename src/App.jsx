@@ -210,6 +210,7 @@ async function fetchData() {
         if (cm2) {
           setLoggedInMember(cm2);
           setCurrentBagger(cm2.name);
+          setPage("contest");
         }
       }
     }
