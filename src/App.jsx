@@ -1169,7 +1169,7 @@ async function fetchData() {
             <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "14px 20px" }}>
               <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 600, marginBottom: 10 }}>WEIGHTING SYSTEM</div>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {[{ label: "Top 15", value: "+5 pts", color: "#ef4444" }, { label: "Rank 16-30", value: "+3 pts", color: "#f97316" }, { label: "Rank 31-45", value: "0 pts", color: "#64748b" }, { label: "Rank 46-60", value: "-3 pts", color: "#22c55e" }, { label: "Rank 60+", value: "-5 pts", color: "#4a90d9" }].map(w => (
+                {[{ label: "Top 15", value: "+5 pts", color: "#ef4444" }, { label: "Rank 16-30", value: "+3 pts", color: "#f97316" }, { label: "Rank 31-45", value: "0 pts", color: "#64748b" }, { label: "Rank 46-60", value: "-3 pts", color: "#22c55e" }, { label: "Rank 60+", value: "-5 pts", color: "#4a90d9" }, { label: "Missed Cut", value: "80 + weight", color: BILLS_RED }].map(w => (
                   <div key={w.label} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 12px", display: "flex", gap: 8, alignItems: "center" }}>
                     <span style={{ fontSize: 11, color: "#94a3b8" }}>{w.label}</span>
                     <span style={{ fontSize: 12, color: w.color, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{w.value}</span>
