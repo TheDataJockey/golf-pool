@@ -1441,10 +1441,10 @@ const memberPicks = contestPicks.filter(p =>
                             <span style={{ fontSize: 13, color: BILLS_WHITE }}>{pick.golfer_name}</span>
                             {!isLocked && (
                               <button onClick={async () => {
-                                console.log("Deleting pick:", pick.id, pick);
                                 const { error } = await supabase.from("contest_picks").delete().eq("id", pick.id);
-                                console.log("Delete error:", error);
-                                await fetchData();
+                                if (!error) {
+                                  setContestPicks(prev => prev.filter(p => p.id !== pick.id));
+                                }
                               }} style={{ background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 14, padding: 0 }}>✕</button>
                             )}
                           </div>
