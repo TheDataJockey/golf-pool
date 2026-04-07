@@ -1244,19 +1244,6 @@ async function fetchData() {
                   });
 
                   const golferScores = Object.values(latestByGolfer);
-                  // Sort by net points, take best 4
-                  const sorted = golferScores.sort((a, b) => a.net_points - b.net_points);
-                  const best4 = sorted.slice(0, 4);
-                  const total = best4.reduce((sum, s) => sum + (s.net_points || 0), 0);
-
-                  return { member, golferScores, best4, total };
-                });
-
-                const standings = memberStandings.sort((a, b) => a.total - b.total);
-
-                if (standings.every(s => s.golferScores.length === 0)) return (
-                  <div style={{ padding: 32, textAlign: "center", color: "#475569", fontSize: 14 }}>No scores yet for this tournament</div>
-                );
 
 return standings.map((s, i) => (
                   <div key={s.member.id} style={{ borderBottom: `1px solid rgba(0,51,141,0.08)` }}>
