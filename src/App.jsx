@@ -352,7 +352,10 @@ async function fetchData() {
           </div>
           <button type="submit" style={{ background: BILLS_RED, border: "none", borderRadius: 10, padding: "12px", color: BILLS_WHITE, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 4 }}>SIGN IN</button>
         </form>
-        <div style={{ textAlign: "center", marginTop: 16 }}>
+        <div style={{ textAlign: "center", marginTop: 12, fontSize: 12, color: "#475569" }}>
+          First time logging in? Enter your email above and click Forgot Password to set your password.
+        </div>
+        <div style={{ textAlign: "center", marginTop: 8 }}>
           <button onClick={async () => {
             if (!email) { alert("Enter your email address first then click Forgot Password."); return; }
             const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: "https://baggersgolf.com/#recovery" });
