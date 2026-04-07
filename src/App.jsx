@@ -50,13 +50,14 @@ const fmt = (n) => n >= 1000000 ? `$${(n / 1000000).toFixed(2)}M` : n >= 1000 ? 
 const fmtFull = (n) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 const NAV = [
-  { id: "dashboard", label: "Dashboard", icon: "📊" },
-  { id: "thisweek", label: "This Week", icon: "⛳" },
-  { id: "mypick", label: "My Pick", icon: "🎯" },
-  { id: "picks", label: "Picks by Week", icon: "🏌️" },
-  { id: "board", label: "Board", icon: "📌" },
-  { id: "schedule", label: "Schedule", icon: "📅" },
-  { id: "members", label: "Members", icon: "👥" },
+  { id: "dashboard", label: "Dashboard", icon: "📊", pools: ["main"] },
+  { id: "thisweek", label: "This Week", icon: "⛳", pools: ["main"] },
+  { id: "mypick", label: "My Pick", icon: "🎯", pools: ["main"] },
+  { id: "picks", label: "Picks by Week", icon: "🏌️", pools: ["main"] },
+  { id: "board", label: "Board", icon: "📌", pools: ["main", "contest"] },
+  { id: "schedule", label: "Schedule", icon: "📅", pools: ["main", "contest"] },
+  { id: "members", label: "Members", icon: "👥", pools: ["main"] },
+  { id: "contest", label: "Contest", icon: "🏆", pools: ["main", "contest"] },
 ];
 
 function Avatar({ bagger, size = 40, i = 0 }) {
@@ -108,6 +109,7 @@ export default function App() {
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionMatches, setMentionMatches] = useState([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [loggedInMember, setLoggedInMember] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -182,15 +184,26 @@ export default function App() {
     if (t) setTournaments(t);
     if (f) setField(f);
     if (po) setPosts(po);
-    const userEmail = session?.user?.email;
+const userEmail = session?.user?.email;
     if (userEmail && b) {
       const match = b.find(bagger => bagger.email.toLowerCase() === userEmail.toLowerCase());
       if (match) {
         setLoggedInBagger(match);
         setCurrentBagger(match.name);
+        setLoggedInMember(match);
+      } else {
+        // Check contest_members for non-baggers
+        const { data: cm } = await supabase
+          .from("contest_members")
+          .select("*")
+          .eq("email", userEmail.toLowerCase())
+          .single();
+        if (cm) {
+          setLoggedInMember(cm);
+          setCurrentBagger(cm.name);
+        }
       }
     }
-  }
 
   async function refreshLivePositions() {
     const current = tournaments.find(t => {
@@ -377,7 +390,10 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", overflowX: "auto", borderTop: `1px solid ${BORDER}` }}>
-            {NAV.map(item => (
+            {NAV.filter(item => {
+              const userPools = loggedInBagger?.pools || loggedInMember?.pools || ["contest"];
+              return item.pools.some(p => userPools.includes(p));
+            }).map(item => (
               <button key={item.id} onClick={() => setPage(item.id)}
                 style={{ flex: "0 0 auto", background: "transparent", border: "none", borderBottom: page === item.id ? `2px solid ${BILLS_RED}` : "2px solid transparent", padding: "8px 14px", color: page === item.id ? BILLS_RED : "#64748b", fontFamily: "'DM Sans', sans-serif", fontSize: 10, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 56, fontWeight: page === item.id ? 600 : 400 }}>
                 <span style={{ fontSize: 16 }}>{item.icon}</span>
@@ -408,9 +424,12 @@ export default function App() {
             )}
           </div>
           <nav style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
-            {NAV.map(item => (
-              <button key={item.id} onClick={() => setPage(item.id)}
-                style={{ background: page === item.id ? "rgba(198,12,48,0.15)" : "transparent", border: page === item.id ? "1px solid rgba(198,12,48,0.4)" : "1px solid transparent", borderRadius: 10, padding: "10px 14px", color: page === item.id ? "#ff6b6b" : "#64748b", fontFamily: "'DM Sans', sans-serif", fontSize: 14, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
+          {NAV.filter(item => {
+            const userPools = loggedInBagger?.pools || loggedInMember?.pools || ["contest"];
+            return item.pools.some(p => userPools.includes(p));
+          }).map(item => (
+            <button key={item.id} onClick={() => setPage(item.id)}
+              style={{ background: page === item.id ? "rgba(198,12,48,0.15)": "transparent", border: page === item.id ? "1px solid rgba(198,12,48,0.4)" : "1px solid transparent", borderRadius: 10, padding: "10px 14px", color: page === item.id ? "#ff6b6b" : "#64748b", fontFamily: "'DM Sans', sans-serif", fontSize: 14, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
                 {item.icon} {item.label}
               </button>
             ))}
