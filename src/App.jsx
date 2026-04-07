@@ -1660,7 +1660,6 @@ async function fetchData() {
                     if (!error) { await fetchData(); setProfileSaving(false); setShowProfile(false); }
                     else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
                   }}
-
                   style={{ width: "100%", background: BILLS_RED, border: "none", borderRadius: 12, padding: "14px", color: BILLS_WHITE, fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }}>
                   {profileSaving ? "Saving..." : "Save Profile"}
                 </button>
