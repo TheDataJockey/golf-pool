@@ -110,6 +110,9 @@ export default function App() {
   const [mentionMatches, setMentionMatches] = useState([]);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [loggedInMember, setLoggedInMember] = useState(null);
+  const [contestMembers, setContestMembers] = useState([]);
+  const [contestPicks, setContestPicks] = useState([]);
+  const [contestScores, setContestScores] = useState([]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -171,20 +174,26 @@ export default function App() {
     }
   }, [session, page]);
 
-  async function fetchData() {
-    const [{ data: b }, { data: p }, { data: t }, { data: f }, { data: po }] = await Promise.all([
+async function fetchData() {
+    const [{ data: b }, { data: p }, { data: t }, { data: f }, { data: po }, { data: cm }, { data: cp }, { data: cs }] = await Promise.all([
       supabase.from("baggers").select("*"),
       supabase.from("picks").select("*, baggers(name, avatar_url), tournaments(week_number, name)"),
       supabase.from("tournaments").select("*").order("week_number"),
       supabase.from("weekly_field").select("*").order("owgr_rank", { ascending: true, nullsFirst: false }),
       supabase.from("posts").select("*").order("created_at", { ascending: false }),
+      supabase.from("contest_members").select("*"),
+      supabase.from("contest_picks").select("*, contest_members(name), tournaments(week_number, name)"),
+      supabase.from("contest_scores").select("*").order("round_date", { ascending: false }),
     ]);
     if (b) setBaggers(b);
     if (p) setPicks(p);
     if (t) setTournaments(t);
     if (f) setField(f);
     if (po) setPosts(po);
-const userEmail = session?.user?.email;
+    if (cm) setContestMembers(cm);
+    if (cp) setContestPicks(cp);
+    if (cs) setContestScores(cs);
+    const userEmail = session?.user?.email;
     if (userEmail && b) {
       const match = b.find(bagger => bagger.email.toLowerCase() === userEmail.toLowerCase());
       if (match) {
@@ -192,18 +201,18 @@ const userEmail = session?.user?.email;
         setCurrentBagger(match.name);
         setLoggedInMember(match);
       } else {
-        // Check contest_members for non-baggers
-        const { data: cm } = await supabase
+        const { data: cm2 } = await supabase
           .from("contest_members")
           .select("*")
           .eq("email", userEmail.toLowerCase())
           .single();
-        if (cm) {
-          setLoggedInMember(cm);
-          setCurrentBagger(cm.name);
+        if (cm2) {
+          setLoggedInMember(cm2);
+          setCurrentBagger(cm2.name);
         }
       }
     }
+  }
 
   async function refreshLivePositions() {
     const current = tournaments.find(t => {
@@ -1144,6 +1153,325 @@ const userEmail = session?.user?.email;
                 </div>
               );
             })}
+          </div>
+        )}
+
+{/* ── CONTEST ── */}
+        {page === "contest" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Header */}
+            <div style={{ background: "rgba(198,12,48,0.08)", border: "1px solid rgba(198,12,48,0.25)", borderRadius: 16, padding: m ? "16px" : "20px 28px" }}>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: m ? 18 : 24, color: BILLS_WHITE, marginBottom: 4 }}>🏆 Contest Pool</div>
+              <div style={{ fontSize: 13, color: "#64748b" }}>Pick 5 golfers — best 4 scores count. Lowest net points wins.</div>
+            </div>
+
+            {/* Scoring key */}
+            <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "14px 20px" }}>
+              <div style={{ fontSize: 11, color: BILLS_RED, letterSpacing: "0.1em", fontWeight: 600, marginBottom: 10 }}>WEIGHTING SYSTEM</div>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {[
+                  { label: "Top 15", value: "+5 pts", color: "#ef4444" },
+                  { label: "Rank 16-30", value: "+3 pts", color: "#f97316" },
+                  { label: "Rank 31-45", value: "0 pts", color: "#64748b" },
+                  { label: "Rank 46-60", value: "-3 pts", color: "#22c55e" },
+                  { label: "Rank 60+", value: "-5 pts", color: "#4a90d9" },
+                ].map(w => (
+                  <div key={w.label} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: "#94a3b8" }}>{w.label}</span>
+                    <span style={{ fontSize: 12, color: w.color, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{w.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Current standings */}
+            <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: BILLS_WHITE }}>Current Standings</span>
+              </div>
+
+              {(() => {
+                // Find active contest tournament
+                const activeTournament = tournaments.find(t => {
+                  const s = new Date(t.start_date + 'T00:00:00Z');
+                  const e = new Date(t.end_date + 'T23:59:59Z');
+                  return new Date() >= s && new Date() <= e;
+                });
+
+                if (!activeTournament) return (
+                  <div style={{ padding: 32, textAlign: "center", color: "#475569", fontSize: 14 }}>No active tournament</div>
+                );
+
+                // Calculate standings from contest scores
+                const memberStandings = contestMembers.map(member => {
+                  const memberScores = contestScores.filter(s =>
+                    s.member_id === member.id &&
+                    s.tournament_id === activeTournament.id
+                  );
+
+                  // Get latest score per golfer
+                  const latestByGolfer: Record<string, any> = {};
+                  memberScores.forEach(s => {
+                    if (!latestByGolfer[s.golfer_name] || s.round_date > latestByGolfer[s.golfer_name].round_date) {
+                      latestByGolfer[s.golfer_name] = s;
+                    }
+                  });
+
+                  const golferScores = Object.values(latestByGolfer);
+                  // Sort by net points, take best 4
+                  const sorted = golferScores.sort((a: any, b: any) => a.net_points - b.net_points);
+                  const best4 = sorted.slice(0, 4);
+                  const total = best4.reduce((sum: number, s: any) => sum + (s.net_points || 0), 0);
+
+                  return { member, golferScores, best4, total };
+                });
+
+                const standings = memberStandings.sort((a, b) => a.total - b.total);
+
+                if (standings.every(s => s.golferScores.length === 0)) return (
+                  <div style={{ padding: 32, textAlign: "center", color: "#475569", fontSize: 14 }}>No scores yet for this tournament</div>
+                );
+
+                return standings.map((s, i) => (
+                  <div key={s.member.id} style={{ display: "flex", alignItems: "center", padding: m ? "10px 16px" : "12px 24px", borderBottom: `1px solid rgba(0,51,141,0.08)`, background: i === 0 ? "rgba(198,12,48,0.06)" : "transparent", gap: 12 }}>
+                    <div style={{ width: 24, fontFamily: "'DM Mono', monospace", fontSize: 12, color: i === 0 ? BILLS_RED : "#475569" }}>#{i + 1}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, color: BILLS_WHITE, fontWeight: i === 0 ? 600 : 400 }}>{s.member.name}</div>
+                      <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
+                        {s.best4.map((g: any) => g.golfer_name).join(", ") || "No picks"}
+                      </div>
+                    </div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: i === 0 ? BILLS_RED : "#64748b", fontWeight: 700 }}>
+                      {s.golferScores.length > 0 ? s.total : "—"}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* Detailed tracker by member */}
+            <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: BILLS_WHITE }}>Detailed Tracker</span>
+              </div>
+
+              {(() => {
+                const activeTournament = tournaments.find(t => {
+                  const s = new Date(t.start_date + 'T00:00:00Z');
+                  const e = new Date(t.end_date + 'T23:59:59Z');
+                  return new Date() >= s && new Date() <= e;
+                });
+
+                if (!activeTournament) return (
+                  <div style={{ padding: 32, textAlign: "center", color: "#475569", fontSize: 14 }}>No active tournament</div>
+                );
+
+                return contestMembers.map(member => {
+                  const memberPicks = contestPicks.filter(p =>
+                    p.member_id === member.id &&
+                    p.tournament_id === activeTournament.id
+                  );
+
+                  if (memberPicks.length === 0) return null;
+
+                  const memberScores = contestScores.filter(s =>
+                    s.member_id === member.id &&
+                    s.tournament_id === activeTournament.id
+                  );
+
+                  // Get latest score per golfer
+                  const latestByGolfer: Record<string, any> = {};
+                  memberScores.forEach(s => {
+                    if (!latestByGolfer[s.golfer_name] || s.round_date > latestByGolfer[s.golfer_name].round_date) {
+                      latestByGolfer[s.golfer_name] = s;
+                    }
+                  });
+
+                  const golferScores = memberPicks.map(pick => ({
+                    ...pick,
+                    score: latestByGolfer[pick.golfer_name] || null,
+                  })).sort((a, b) => (a.score?.net_points || 999) - (b.score?.net_points || 999));
+
+                  const best4NetPoints = golferScores
+                    .filter(g => g.score)
+                    .slice(0, 4)
+                    .reduce((sum, g) => sum + (g.score?.net_points || 0), 0);
+
+                  return (
+                    <div key={member.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                      <div style={{ padding: "12px 20px", background: "rgba(0,51,141,0.1)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, color: BILLS_WHITE }}>{member.name}</div>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: BILLS_RED, fontWeight: 700 }}>
+                          Total: {best4NetPoints} pts
+                        </div>
+                      </div>
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                              {["GOLFER", "OWGR", "POSITION", "WEIGHTING", "NET PTS", "COUNTS"].map(h => (
+                                <th key={h} style={{ padding: "8px 16px", textAlign: h === "GOLFER" ? "left" : "center", color: "#475569", fontWeight: 600, fontSize: 10, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {golferScores.map((g, i) => {
+                              const counts = i < 4 && g.score;
+                              return (
+                                <tr key={g.id} style={{ borderBottom: `1px solid rgba(0,51,141,0.06)`, background: counts ? "rgba(34,197,94,0.04)" : "transparent" }}>
+                                  <td style={{ padding: "10px 16px", color: counts ? BILLS_WHITE : "#64748b", fontWeight: counts ? 600 : 400 }}>{g.golfer_name}</td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center", color: "#64748b", fontFamily: "'DM Mono', monospace" }}>
+                                    {g.score?.owgr_rank ? `#${g.score.owgr_rank}` : "—"}
+                                  </td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: BILLS_WHITE }}>
+                                    {g.score?.finish_position || "—"}
+                                  </td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: g.score?.weighting > 0 ? "#ef4444" : g.score?.weighting < 0 ? "#22c55e" : "#64748b" }}>
+                                    {g.score?.weighting !== undefined ? (g.score.weighting > 0 ? `+${g.score.weighting}` : g.score.weighting) : "—"}
+                                  </td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: BILLS_WHITE, fontWeight: 700 }}>
+                                    {g.score?.net_points !== undefined ? g.score.net_points : "—"}
+                                  </td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center" }}>
+                                    {counts ? <span style={{ fontSize: 10, background: "rgba(34,197,94,0.15)", color: "#22c55e", borderRadius: 20, padding: "2px 8px" }}>✓</span>
+                                      : <span style={{ fontSize: 10, color: "#334155" }}>—</span>}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* My Picks section */}
+            {(() => {
+              const activeTournament = tournaments.find(t => {
+                const s = new Date(t.start_date + 'T00:00:00Z');
+                const e = new Date(t.end_date + 'T23:59:59Z');
+                return new Date() >= s && new Date() <= e;
+              }) || tournaments.find(t => {
+                if (!t.start_date || !t.pick_deadline) return false;
+                const s = new Date(t.start_date);
+                const deadline = new Date(t.pick_deadline);
+                const monday = new Date(s);
+                monday.setDate(s.getDate() - 3);
+                monday.setHours(11, 0, 0, 0);
+                return new Date() >= monday && new Date() < deadline;
+              });
+
+              if (!activeTournament) return null;
+
+              const myMember = contestMembers.find(cm =>
+                cm.email?.toLowerCase() === session?.user?.email?.toLowerCase()
+              );
+
+              if (!myMember) return null;
+
+              const myContestPicks = contestPicks.filter(p =>
+                p.member_id === myMember.id &&
+                p.tournament_id === activeTournament.id
+              );
+
+              const deadline = activeTournament.pick_deadline ? new Date(activeTournament.pick_deadline) : null;
+              const isLocked = deadline && new Date() > deadline;
+
+              return (
+                <div style={{ background: "rgba(0,51,141,0.08)", border: `1px solid ${BORDER}`, borderRadius: 16, overflow: "hidden" }}>
+                  <div style={{ padding: "14px 20px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 4, height: 18, background: BILLS_RED, borderRadius: 2 }} />
+                      <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, color: BILLS_WHITE }}>My Contest Picks — {activeTournament.name}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: myContestPicks.length >= 5 ? "#22c55e" : BILLS_RED }}>
+                      {myContestPicks.length}/5 picks
+                    </div>
+                  </div>
+
+                  {/* Current picks */}
+                  {myContestPicks.length > 0 && (
+                    <div style={{ padding: "12px 20px", borderBottom: `1px solid ${BORDER}` }}>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>YOUR PICKS</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {myContestPicks.map(pick => (
+                          <div key={pick.id} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(198,12,48,0.1)", border: "1px solid rgba(198,12,48,0.25)", borderRadius: 20, padding: "4px 12px" }}>
+                            <span style={{ fontSize: 13, color: BILLS_WHITE }}>{pick.golfer_name}</span>
+                            {!isLocked && (
+                              <button onClick={async () => {
+                                await supabase.from("contest_picks").delete().eq("id", pick.id);
+                                await fetchData();
+                              }} style={{ background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 14, padding: 0 }}>✕</button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pick from field */}
+                  {!isLocked && myContestPicks.length < 5 && (
+                    <div style={{ padding: "12px 20px" }}>
+                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>
+                        SELECT {5 - myContestPicks.length} MORE GOLFER{5 - myContestPicks.length !== 1 ? "S" : ""}
+                      </div>
+                      <input
+                        placeholder="Search golfers..."
+                        onChange={e => setSearchPick(e.target.value)}
+                        value={searchPick}
+                        style={{ width: "100%", background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 12px", color: BILLS_WHITE, fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", marginBottom: 10, boxSizing: "border-box" }} />
+                      <div style={{ maxHeight: 280, overflowY: "auto", border: `1px solid ${BORDER}`, borderRadius: 10 }}>
+                        {field
+                          .filter(p => p.player_name.toLowerCase().includes(searchPick.toLowerCase()))
+                          .filter(p => !myContestPicks.some(cp => cp.golfer_name === p.player_name))
+                          .map((player, i) => (
+                            <div key={player.id} onClick={async () => {
+                              if (myContestPicks.length >= 5) return;
+                              await supabase.from("contest_picks").insert({
+                                member_id: myMember.id,
+                                tournament_id: activeTournament.id,
+                                golfer_name: player.player_name,
+                                datagolf_name: player.datagolf_name,
+                              });
+                              await fetchData();
+                              setSearchPick("");
+                            }}
+                              style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderBottom: `1px solid rgba(0,51,141,0.06)`, cursor: "pointer", background: i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent" }}
+                              onMouseEnter={e => e.currentTarget.style.background = "rgba(198,12,48,0.08)"}
+                              onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent"}>
+                              <div style={{ width: 44, fontFamily: "'DM Mono', monospace", fontSize: 11, color: !player.owgr_rank ? "#334155" : player.owgr_rank <= 15 ? BILLS_RED : player.owgr_rank <= 30 ? "#f97316" : player.owgr_rank <= 45 ? "#64748b" : player.owgr_rank <= 60 ? "#22c55e" : "#4a90d9" }}>
+                                {player.owgr_rank ? `#${player.owgr_rank}` : "—"}
+                              </div>
+                              <div style={{ flex: 1, fontSize: 13, color: "#94a3b8" }}>{player.player_name}</div>
+                              <div style={{ fontSize: 10, color: !player.owgr_rank ? "#334155" : player.owgr_rank <= 15 ? BILLS_RED : player.owgr_rank <= 30 ? "#f97316" : player.owgr_rank <= 45 ? "#64748b" : player.owgr_rank <= 60 ? "#22c55e" : "#4a90d9" }}>
+                                {!player.owgr_rank ? "—" : player.owgr_rank <= 15 ? "+5" : player.owgr_rank <= 30 ? "+3" : player.owgr_rank <= 45 ? "0" : player.owgr_rank <= 60 ? "-3" : "-5"}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {isLocked && (
+                    <div style={{ padding: 24, textAlign: "center", color: "#475569", fontSize: 13 }}>
+                      🔒 Picks are locked for this tournament
+                    </div>
+                  )}
+
+                  {!isLocked && myContestPicks.length >= 5 && (
+                    <div style={{ padding: 16, textAlign: "center", background: "rgba(34,197,94,0.06)", borderTop: `1px solid rgba(34,197,94,0.2)` }}>
+                      <span style={{ fontSize: 13, color: "#22c55e" }}>✅ All 5 picks submitted!</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
