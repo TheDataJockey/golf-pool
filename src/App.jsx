@@ -1206,6 +1206,30 @@ async function fetchData() {
 
                 // Calculate standings from contest scores
                 const memberStandings = contestMembers.map(member => {
+                    const memberPicks = contestPicks.filter(p =>
+                      p.member_id === member.id &&
+                      p.tournament_id === activeTournament.id
+                    );
+
+                    const enrichedPicks = memberPicks.map(pick => {
+                      const fieldPlayer = field.find(f => f.player_name === pick.golfer_name || f.datagolf_name === pick.datagolf_name);
+                      const owgr = fieldPlayer?.owgr_rank || null;
+                      const weighting = !owgr ? 0 : owgr <= 15 ? 5 : owgr <= 30 ? 3 : owgr <= 45 ? 0 : owgr <= 60 ? -3 : -5;
+                      const latestScore = contestScores.find(s => s.member_id === member.id && s.golfer_name === pick.golfer_name && s.tournament_id === activeTournament.id);
+                      const position = latestScore?.finish_position || 0;
+                      const netPoints = position > 0 ? position + weighting : 0;
+                      return { ...pick, owgr, weighting, position, netPoints };
+                    });
+
+                    const best4 = enrichedPicks.filter(p => p.position > 0).sort((a, b) => a.netPoints - b.netPoints).slice(0, 4);
+                    const total = best4.reduce((sum, p) => sum + p.netPoints, 0);
+
+                    return { member, enrichedPicks, best4, total };
+                  });
+
+                  const standings = memberStandings
+                    .filter(s => s.enrichedPicks.length > 0)
+                    .sort((a, b) => a.total - b.total);
                   const memberScores = contestScores.filter(s =>
                     s.member_id === member.id &&
                     s.tournament_id === activeTournament.id
@@ -1234,17 +1258,26 @@ async function fetchData() {
                   <div style={{ padding: 32, textAlign: "center", color: "#475569", fontSize: 14 }}>No scores yet for this tournament</div>
                 );
 
-                return standings.map((s, i) => (
-                  <div key={s.member.id} style={{ display: "flex", alignItems: "center", padding: m ? "10px 16px" : "12px 24px", borderBottom: `1px solid rgba(0,51,141,0.08)`, background: i === 0 ? "rgba(198,12,48,0.06)" : "transparent", gap: 12 }}>
-                    <div style={{ width: 24, fontFamily: "'DM Mono', monospace", fontSize: 12, color: i === 0 ? BILLS_RED : "#475569" }}>#{i + 1}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, color: BILLS_WHITE, fontWeight: i === 0 ? 600 : 400 }}>{s.member.name}</div>
-                      <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
-                        {s.best4.map(g => g.golfer_name).join(", ") || "No picks"}
+return standings.map((s, i) => (
+                  <div key={s.member.id} style={{ borderBottom: `1px solid rgba(0,51,141,0.08)` }}>
+                    <div style={{ display: "flex", alignItems: "center", padding: m ? "10px 16px" : "12px 24px", background: i === 0 ? "rgba(198,12,48,0.06)" : "transparent", gap: 12 }}>
+                      <div style={{ width: 24, fontFamily: "'DM Mono', monospace", fontSize: 12, color: i === 0 ? BILLS_RED : "#475569" }}>#{i + 1}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, color: BILLS_WHITE, fontWeight: i === 0 ? 600 : 400 }}>{s.member.name}</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                          {s.enrichedPicks.map(g => (
+                            <span key={g.golfer_name} style={{ fontSize: 10, background: "rgba(0,51,141,0.2)", border: `1px solid ${BORDER}`, borderRadius: 20, padding: "2px 8px", color: "#94a3b8" }}>
+                              {g.golfer_name}
+                              <span style={{ color: g.weighting > 0 ? "#ef4444" : g.weighting < 0 ? "#22c55e" : "#64748b", marginLeft: 4 }}>
+                                ({g.weighting > 0 ? `+${g.weighting}` : g.weighting})
+                              </span>
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: i === 0 ? BILLS_RED : "#64748b", fontWeight: 700 }}>
-                      {s.golferScores.length > 0 ? s.total : "—"}
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 15, color: i === 0 ? BILLS_RED : "#64748b", fontWeight: 700 }}>
+                        {s.total > 0 ? s.total : "—"}
+                      </div>
                     </div>
                   </div>
                 ));
@@ -1270,12 +1303,29 @@ async function fetchData() {
                 );
 
                 return contestMembers.map(member => {
-                  const memberPicks = contestPicks.filter(p =>
+const memberPicks = contestPicks.filter(p =>
                     p.member_id === member.id &&
                     p.tournament_id === activeTournament.id
                   );
 
                   if (memberPicks.length === 0) return null;
+
+                  // Enrich picks with field data
+                  const enrichedPicks = memberPicks.map(pick => {
+                    const fieldPlayer = field.find(f => f.player_name === pick.golfer_name || f.datagolf_name === pick.datagolf_name);
+                    const owgr = fieldPlayer?.owgr_rank || null;
+                    const weighting = !owgr ? 0 : owgr <= 15 ? 5 : owgr <= 30 ? 3 : owgr <= 45 ? 0 : owgr <= 60 ? -3 : -5;
+                    const latestScore = contestScores.find(s => s.member_id === member.id && s.golfer_name === pick.golfer_name && s.tournament_id === activeTournament.id);
+                    const position = latestScore?.finish_position || 0;
+                    const netPoints = position > 0 ? position + weighting : 0;
+                    return { ...pick, owgr, weighting, position, netPoints };
+                  }).sort((a, b) => {
+                    if (a.netPoints && b.netPoints) return a.netPoints - b.netPoints;
+                    return (a.owgr || 999) - (b.owgr || 999);
+                  });
+
+                  const best4 = enrichedPicks.filter(p => p.position > 0).slice(0, 4);
+                  const best4Total = best4.reduce((sum, p) => sum + p.netPoints, 0);
 
                   const memberScores = contestScores.filter(s =>
                     s.member_id === member.id &&
@@ -1318,22 +1368,22 @@ async function fetchData() {
                             </tr>
                           </thead>
                           <tbody>
-                            {golferScores.map((g, i) => {
-                              const counts = i < 4 && g.score;
+{enrichedPicks.map((g, i) => {
+                              const counts = best4.some(b => b.golfer_name === g.golfer_name);
                               return (
                                 <tr key={g.id} style={{ borderBottom: `1px solid rgba(0,51,141,0.06)`, background: counts ? "rgba(34,197,94,0.04)" : "transparent" }}>
                                   <td style={{ padding: "10px 16px", color: counts ? BILLS_WHITE : "#64748b", fontWeight: counts ? 600 : 400 }}>{g.golfer_name}</td>
-                                  <td style={{ padding: "10px 16px", textAlign: "center", color: "#64748b", fontFamily: "'DM Mono', monospace" }}>
-                                    {g.score?.owgr_rank ? `#${g.score.owgr_rank}` : "—"}
+                                  <td style={{ padding: "10px 16px", textAlign: "center", color: !g.owgr ? "#334155" : g.owgr <= 15 ? BILLS_RED : g.owgr <= 30 ? "#f97316" : "#64748b", fontFamily: "'DM Mono', monospace" }}>
+                                    {g.owgr ? `#${g.owgr}` : "—"}
                                   </td>
                                   <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: BILLS_WHITE }}>
-                                    {g.score?.finish_position || "—"}
+                                    {g.position > 0 ? g.position : "—"}
                                   </td>
-                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: g.score?.weighting > 0 ? "#ef4444" : g.score?.weighting < 0 ? "#22c55e" : "#64748b" }}>
-                                    {g.score?.weighting !== undefined ? (g.score.weighting > 0 ? `+${g.score.weighting}` : g.score.weighting) : "—"}
+                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: g.weighting > 0 ? "#ef4444" : g.weighting < 0 ? "#22c55e" : "#64748b" }}>
+                                    {g.weighting > 0 ? `+${g.weighting}` : g.weighting}
                                   </td>
                                   <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: BILLS_WHITE, fontWeight: 700 }}>
-                                    {g.score?.net_points !== undefined ? g.score.net_points : "—"}
+                                    {g.position > 0 ? g.netPoints : "—"}
                                   </td>
                                   <td style={{ padding: "10px 16px", textAlign: "center" }}>
                                     {counts ? <span style={{ fontSize: 10, background: "rgba(34,197,94,0.15)", color: "#22c55e", borderRadius: 20, padding: "2px 8px" }}>✓</span>
@@ -1341,8 +1391,7 @@ async function fetchData() {
                                   </td>
                                 </tr>
                               );
-                            })}
-                          </tbody>
+                            })}                          </tbody>
                         </table>
                       </div>
                     </div>
