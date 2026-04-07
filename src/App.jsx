@@ -1196,7 +1196,20 @@ async function fetchData() {
                   const monday = new Date(s); monday.setDate(s.getDate() - 3); monday.setHours(11, 0, 0, 0);
                   return new Date() >= monday && new Date() < deadline;
                 });
+                
                 if (!activeTournament) return <div style={{ padding: 32, textAlign: "center", color: "#475569", fontSize: 14 }}>No active tournament</div>;
+
+                const myMember = contestMembers.find(cm => cm.email?.toLowerCase() === session?.user?.email?.toLowerCase());
+                const myPicks = contestPicks.filter(p => p.member_id === myMember?.id && p.tournament_id === activeTournament.id);
+                const hasSubmitted = myPicks.length >= 5;
+
+                if (!hasSubmitted) return (
+                  <div style={{ padding: 32, textAlign: "center" }}>
+                    <div style={{ fontSize: 24, marginBottom: 12 }}>🔒</div>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE, marginBottom: 8 }}>Submit your 5 picks to see standings</div>
+                    <div style={{ fontSize: 13, color: "#475569" }}>Standings are hidden until you lock in your picks</div>
+                  </div>
+                );
 
                 const memberStandings = contestMembers.map(member => {
                   const memberPicks = contestPicks.filter(p => p.member_id === member.id && p.tournament_id === activeTournament.id);
@@ -1262,6 +1275,19 @@ async function fetchData() {
                   return new Date() >= monday && new Date() < deadline;
                 });
                 if (!activeTournament) return <div style={{ padding: 32, textAlign: "center", color: "#475569", fontSize: 14 }}>No active tournament</div>;
+
+                const myMember = contestMembers.find(cm => cm.email?.toLowerCase() === session?.user?.email?.toLowerCase());
+                const myPicks = contestPicks.filter(p => p.member_id === myMember?.id && p.tournament_id === activeTournament.id);
+                const hasSubmitted = myPicks.length >= 5;
+
+                if (!hasSubmitted) return (
+                  <div style={{ padding: 32, textAlign: "center" }}>
+                    <div style={{ fontSize: 24, marginBottom: 12 }}>🔒</div>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, color: BILLS_WHITE, marginBottom: 8 }}>Submit your 5 picks to see standings</div>
+                    <div style={{ fontSize: 13, color: "#475569" }}>Standings are hidden until you lock in your picks</div>
+                  </div>
+                );
+
 
                 return contestMembers.map(member => {
                   const memberPicks = contestPicks.filter(p => p.member_id === member.id && p.tournament_id === activeTournament.id);
@@ -1427,6 +1453,10 @@ async function fetchData() {
                   {!isLocked && (
                     <div style={{ padding: 16 }}>
                       <button disabled={totalStaged < 5} onClick={async () => {
+                        if (totalStaged < 5) return;
+                        const golferList = contestPickStaging.map(p => p.golfer_name).join(", ");
+                        const confirmed = window.confirm(`Confirm your 5 picks:\n\n${golferList}\n\nOnce submitted you can still remove picks before the deadline.`);
+                        if (!confirmed) return;
                         for (const pick of contestPickStaging) {
                           await supabase.from("contest_picks").insert({ member_id: myMember.id, tournament_id: activeTournament.id, golfer_name: pick.golfer_name, datagolf_name: pick.datagolf_name });
                         }
