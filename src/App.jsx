@@ -1634,7 +1634,9 @@ async function fetchData() {
                       custom_shoe: profileData.custom_shoe, custom_weather: profileData.custom_weather,
                     }).eq("id", loggedInBagger?.id);
                     if (!error) { await fetchData(); setProfileSaving(false); setShowProfile(false); }
-                    else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
+                      else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
+                    }
+                  }}
                   } else if (loggedInMember) {
                     const { error } = await supabase.from("contest_members").update({
                       name: profileData.name,
