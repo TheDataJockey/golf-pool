@@ -155,6 +155,11 @@ export default function App() {
         setLoading(false);
         return;
       }
+      if (_event === "USER_UPDATED") {
+        setIsResetting(false);
+        setSession(session);
+        return;
+      }
       if (!isResetting) {
         setSession(session);
       }
@@ -390,11 +395,11 @@ async function fetchData() {
             <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ height: 40 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ fontSize: 11, color: "#64748b" }}>{weekNums.length}/32 wks</div>
-              {loggedInBagger && (
-                <button onClick={() => { setProfileData({ ...loggedInBagger }); setShowProfile(true); }}
+              {(loggedInBagger || loggedInMember) && (
+                <button onClick={() => { setProfileData({ ...(loggedInBagger || loggedInMember) }); setShowProfile(true); }}
                   style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 20, padding: "4px 10px 4px 4px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                  <Avatar bagger={loggedInBagger} size={24} i={baggers.findIndex(b => b.name === loggedInBagger.name)} />
-                  <span style={{ fontSize: 12, color: BILLS_WHITE, fontWeight: 600 }}>{loggedInBagger.username || loggedInBagger.name}</span>
+<Avatar bagger={loggedInBagger || loggedInMember} size={24} i={baggers.findIndex(b => b.name === (loggedInBagger || loggedInMember)?.name)} />
+                  <span style={{ fontSize: 12, color: BILLS_WHITE, fontWeight: 600 }}>{(loggedInBagger || loggedInMember)?.username || (loggedInBagger || loggedInMember)?.name}</span>
                 </button>
               )}
               <button onClick={handleLogout} style={{ background: "rgba(198,12,48,0.15)", border: `1px solid rgba(198,12,48,0.3)`, borderRadius: 8, padding: "6px 12px", color: BILLS_RED, fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Out</button>
@@ -422,12 +427,12 @@ async function fetchData() {
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
               <img src="/Baggers_Logo.png" alt="Baggers Golf Pool" style={{ width: 120 }} />
             </div>
-            {loggedInBagger && (
-              <button onClick={() => { setProfileData({ ...loggedInBagger }); setShowProfile(true); }}
+            {(loggedInBagger || loggedInMember) && (
+              <button onClick={() => { setProfileData({ ...(loggedInBagger || loggedInMember) }); setShowProfile(true); }}
                 style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 12, padding: "10px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
-                <Avatar bagger={loggedInBagger} size={32} i={baggers.findIndex(b => b.name === loggedInBagger.name)} />
+<Avatar bagger={loggedInBagger || loggedInMember} size={32} i={baggers.findIndex(b => b.name === (loggedInBagger || loggedInMember)?.name)} />
                 <div style={{ textAlign: "left", flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: BILLS_WHITE, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loggedInBagger.username || loggedInBagger.name}</div>
+                  <div style={{ fontSize: 13, color: BILLS_WHITE, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(loggedInBagger || loggedInMember)?.username || (loggedInBagger || loggedInMember)?.name}</div>
                   <div style={{ fontSize: 10, color: "#475569" }}>Edit Profile</div>
                 </div>
                 <div style={{ fontSize: 12, color: "#475569" }}>⚙️</div>
@@ -1499,8 +1504,8 @@ async function fetchData() {
                     <Avatar bagger={loggedInBagger} size={64} i={baggers.findIndex(b => b.name === loggedInBagger?.name)} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, color: BILLS_WHITE, fontWeight: 700, marginBottom: 4 }}>{loggedInBagger?.name}</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>{loggedInBagger?.email}</div>
+                    <div style={{ fontSize: 16, color: BILLS_WHITE, fontWeight: 700, marginBottom: 4 }}>{(loggedInBagger || loggedInMember)?.name}</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>{(loggedInBagger || loggedInMember)?.email}</div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {["🏌️", "🦬", "⛳", "🏆", "🦅", "💪", "🎯", "🔥", "😎", "🤠", "👑", "💰"].map(emoji => (
                         <button key={emoji} onClick={async () => { await setEmojiAvatar(loggedInBagger.id, emoji); setProfileData(prev => ({ ...prev, avatar_url: emoji })); }}
@@ -1509,8 +1514,27 @@ async function fetchData() {
                         </button>
                       ))}
                     </div>
-                    <div style={{ marginTop: 10 }}>
-                      <input type="file" accept="image/*" onChange={async (e) => { const file = e.target.files?.[0]; if (file && loggedInBagger) await uploadAvatar(loggedInBagger.id, file); }} style={{ fontSize: 11, color: "#64748b" }} />
+<div style={{ marginTop: 10 }}>
+                      <input type="file" accept="image/*" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (loggedInBagger) {
+                          await uploadAvatar(loggedInBagger.id, file);
+                        } else if (loggedInMember) {
+                          setUploadingAvatar(true);
+                          const ext = file.name.split(".").pop();
+                          const path = `public/contest-${loggedInMember.id}.${ext}`;
+                          const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+                          if (!error) {
+                            const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+                            await supabase.from("contest_members").update({ avatar_url: publicUrl }).eq("id", loggedInMember.id);
+                            setLoggedInMember(prev => ({ ...prev, avatar_url: publicUrl }));
+                            setContestMembers(prev => prev.map(m => m.id === loggedInMember.id ? { ...m, avatar_url: publicUrl } : m));
+                          }
+                          setUploadingAvatar(false);
+                        }
+                      }} style={{ fontSize: 11, color: "#64748b" }} />
+                      {uploadingAvatar && <div style={{ fontSize: 11, color: "#f59e0b", marginTop: 4 }}>Uploading...</div>}
                     </div>
                   </div>
                 </div>
@@ -1594,20 +1618,46 @@ async function fetchData() {
                   </button>
                 </div>
 
-                <button onClick={async () => {
+<button onClick={async () => {
                   setProfileSaving(true);
-                  const { error } = await supabase.from("baggers").update({
-                    username: profileData.username, email: profileData.email, dob: profileData.dob || null,
-                    ghin_number: profileData.ghin_number, driver: profileData.driver, fairway_wood: profileData.fairway_wood,
-                    irons: profileData.irons, putter: profileData.putter, golf_ball: profileData.golf_ball,
-                    shirt_brands: profileData.shirt_brands || [], pant_brands: profileData.pant_brands || [],
-                    shoe_brands: profileData.shoe_brands || [], weather_gear_brands: profileData.weather_gear_brands || [],
-                    custom_shirt: profileData.custom_shirt, custom_pant: profileData.custom_pant,
-                    custom_shoe: profileData.custom_shoe, custom_weather: profileData.custom_weather,
-                  }).eq("id", loggedInBagger?.id);
-                  if (!error) { await fetchData(); setProfileSaving(false); setShowProfile(false); }
-                  else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
-                }}
+                  if (loggedInBagger) {
+                    const { error } = await supabase.from("baggers").update({
+                      username: profileData.username, email: profileData.email, dob: profileData.dob || null,
+                      ghin_number: profileData.ghin_number, driver: profileData.driver, fairway_wood: profileData.fairway_wood,
+                      irons: profileData.irons, putter: profileData.putter, golf_ball: profileData.golf_ball,
+                      shirt_brands: profileData.shirt_brands || [], pant_brands: profileData.pant_brands || [],
+                      shoe_brands: profileData.shoe_brands || [], weather_gear_brands: profileData.weather_gear_brands || [],
+                      custom_shirt: profileData.custom_shirt, custom_pant: profileData.custom_pant,
+                      custom_shoe: profileData.custom_shoe, custom_weather: profileData.custom_weather,
+                    }).eq("id", loggedInBagger?.id);
+                    if (!error) { await fetchData(); setProfileSaving(false); setShowProfile(false); }
+                    else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
+                  } else if (loggedInMember) {
+                    const { error } = await supabase.from("contest_members").update({
+                      name: profileData.name,
+                      username: profileData.username,
+                      email: profileData.email,
+                      avatar_url: profileData.avatar_url,
+                      dob: profileData.dob || null,
+                      ghin_number: profileData.ghin_number,
+                      driver: profileData.driver,
+                      fairway_wood: profileData.fairway_wood,
+                      irons: profileData.irons,
+                      putter: profileData.putter,
+                      golf_ball: profileData.golf_ball,
+                      shirt_brands: profileData.shirt_brands || [],
+                      pant_brands: profileData.pant_brands || [],
+                      shoe_brands: profileData.shoe_brands || [],
+                      weather_gear_brands: profileData.weather_gear_brands || [],
+                      custom_shirt: profileData.custom_shirt,
+                      custom_pant: profileData.custom_pant,
+                      custom_shoe: profileData.custom_shoe,
+                      custom_weather: profileData.custom_weather,
+                    }).eq("id", loggedInMember.id);
+                    if (!error) { await fetchData(); setProfileSaving(false); setShowProfile(false); }
+                    else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
+                  }
+
                   style={{ width: "100%", background: BILLS_RED, border: "none", borderRadius: 12, padding: "14px", color: BILLS_WHITE, fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }}>
                   {profileSaving ? "Saving..." : "Save Profile"}
                 </button>
