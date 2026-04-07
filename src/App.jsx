@@ -57,7 +57,7 @@ const NAV = [
   { id: "board", label: "Board", icon: "📌", pools: ["main", "contest"] },
   { id: "schedule", label: "Schedule", icon: "📅", pools: ["main", "contest"] },
   { id: "members", label: "Members", icon: "👥", pools: ["main"] },
-  { id: "contest", label: "Contest", icon: "🏆", pools: ["main", "contest"] },
+  { id: "contest", label: "Mookie's Pool", icon: "🏆", pools: ["main", "contest"] },
 ];
 
 function Avatar({ bagger, size = 40, i = 0 }) {
@@ -1405,7 +1405,9 @@ async function fetchData() {
                             <span style={{ fontSize: 13, color: BILLS_WHITE }}>{pick.golfer_name}</span>
                             {!isLocked && (
                               <button onClick={async () => {
-                                await supabase.from("contest_picks").delete().eq("id", pick.id);
+                                console.log("Deleting pick:", pick.id, pick);
+                                const { error } = await supabase.from("contest_picks").delete().eq("id", pick.id);
+                                console.log("Delete error:", error);
                                 await fetchData();
                               }} style={{ background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 14, padding: 0 }}>✕</button>
                             )}
