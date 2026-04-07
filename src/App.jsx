@@ -1634,34 +1634,22 @@ async function fetchData() {
                       custom_shoe: profileData.custom_shoe, custom_weather: profileData.custom_weather,
                     }).eq("id", loggedInBagger?.id);
                     if (!error) { await fetchData(); setProfileSaving(false); setShowProfile(false); }
-                      else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
-                    }
-                  }}
+                    else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
                   } else if (loggedInMember) {
                     const { error } = await supabase.from("contest_members").update({
-                      name: profileData.name,
-                      username: profileData.username,
-                      email: profileData.email,
-                      avatar_url: profileData.avatar_url,
-                      dob: profileData.dob || null,
-                      ghin_number: profileData.ghin_number,
-                      driver: profileData.driver,
-                      fairway_wood: profileData.fairway_wood,
-                      irons: profileData.irons,
-                      putter: profileData.putter,
-                      golf_ball: profileData.golf_ball,
-                      shirt_brands: profileData.shirt_brands || [],
-                      pant_brands: profileData.pant_brands || [],
-                      shoe_brands: profileData.shoe_brands || [],
-                      weather_gear_brands: profileData.weather_gear_brands || [],
-                      custom_shirt: profileData.custom_shirt,
-                      custom_pant: profileData.custom_pant,
-                      custom_shoe: profileData.custom_shoe,
-                      custom_weather: profileData.custom_weather,
+                      name: profileData.name, username: profileData.username, email: profileData.email,
+                      avatar_url: profileData.avatar_url, dob: profileData.dob || null,
+                      ghin_number: profileData.ghin_number, driver: profileData.driver, fairway_wood: profileData.fairway_wood,
+                      irons: profileData.irons, putter: profileData.putter, golf_ball: profileData.golf_ball,
+                      shirt_brands: profileData.shirt_brands || [], pant_brands: profileData.pant_brands || [],
+                      shoe_brands: profileData.shoe_brands || [], weather_gear_brands: profileData.weather_gear_brands || [],
+                      custom_shirt: profileData.custom_shirt, custom_pant: profileData.custom_pant,
+                      custom_shoe: profileData.custom_shoe, custom_weather: profileData.custom_weather,
                     }).eq("id", loggedInMember.id);
                     if (!error) { await fetchData(); setProfileSaving(false); setShowProfile(false); }
                     else { alert("Error saving profile: " + error.message); setProfileSaving(false); }
-                  }}
+                  }
+                }}
                   style={{ width: "100%", background: BILLS_RED, border: "none", borderRadius: 12, padding: "14px", color: BILLS_WHITE, fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em" }}>
                   {profileSaving ? "Saving..." : "Save Profile"}
                 </button>
