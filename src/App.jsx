@@ -175,9 +175,11 @@ export default function App() {
   }, [session]);
 
   useEffect(() => {
-    if (session && page === "picks") {
-      refreshLivePositions();
-    }
+    if (!session || page !== "contest") return;
+    const interval = setInterval(() => {
+      fetchData();
+    }, 60000); // refresh every 60 seconds
+    return () => clearInterval(interval);
   }, [session, page]);
 
 async function fetchData() {
