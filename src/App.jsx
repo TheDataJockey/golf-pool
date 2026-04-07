@@ -1328,9 +1328,11 @@ async function fetchData() {
                                 <tr key={g.id || g.golfer_name} style={{ borderBottom: `1px solid rgba(0,51,141,0.06)`, background: counts ? "rgba(34,197,94,0.04)" : "transparent" }}>
                                   <td style={{ padding: "10px 16px", color: counts ? BILLS_WHITE : "#64748b", fontWeight: counts ? 600 : 400 }}>{g.golfer_name}</td>
                                   <td style={{ padding: "10px 16px", textAlign: "center", color: !g.owgr ? "#334155" : g.owgr <= 15 ? BILLS_RED : g.owgr <= 30 ? "#f97316" : "#64748b", fontFamily: "'DM Mono', monospace" }}>{g.owgr ? `#${g.owgr}` : "—"}</td>
-                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: BILLS_WHITE }}>{g.position > 0 ? g.position : "—"}</td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: BILLS_WHITE }}>
+                                    {g.position === 80 ? <span style={{ fontSize: 10, background: "rgba(198,12,48,0.15)", color: BILLS_RED, borderRadius: 20, padding: "2px 8px", fontWeight: 700 }}>CUT</span> : g.position > 0 ? g.position : "—"}
+                                  </td>
                                   <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: g.weighting > 0 ? "#ef4444" : g.weighting < 0 ? "#22c55e" : "#64748b" }}>{g.weighting > 0 ? `+${g.weighting}` : g.weighting}</td>
-                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: BILLS_WHITE, fontWeight: 700 }}>{g.position > 0 ? g.netPoints : "—"}</td>
+                                  <td style={{ padding: "10px 16px", textAlign: "center", fontFamily: "'DM Mono', monospace", color: g.position === 80 ? BILLS_RED : BILLS_WHITE, fontWeight: 700 }}>{g.position > 0 ? g.netPoints : "—"}</td>
                                   <td style={{ padding: "10px 16px", textAlign: "center" }}>
                                     {counts ? <span style={{ fontSize: 10, background: "rgba(34,197,94,0.15)", color: "#22c55e", borderRadius: 20, padding: "2px 8px" }}>✓</span> : <span style={{ fontSize: 10, color: "#334155" }}>—</span>}
                                   </td>
