@@ -1391,6 +1391,7 @@ async function fetchData() {
               if (!myMember) return null;
 
               const myContestPicks = contestPicks.filter(p => p.member_id === myMember.id && p.tournament_id === activeTournament.id);
+              console.log("myContestPicks:", myContestPicks.length, "contestPickStaging:", contestPickStaging.length);
               const deadline = activeTournament.pick_deadline ? new Date(activeTournament.pick_deadline) : null;
               const isLocked = deadline && new Date() > deadline;
               const totalStaged = myContestPicks.length + contestPickStaging.length;
