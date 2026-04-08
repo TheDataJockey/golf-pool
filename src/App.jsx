@@ -169,7 +169,7 @@ export default function App() {
       }
     });
 
-    const handleUnload = () => { supabase.auth.signOut(); };
+    const handleUnload = () => { try { supabase.auth.signOut(); } catch(e) {} };
     window.addEventListener("beforeunload", handleUnload);
     return () => window.removeEventListener("beforeunload", handleUnload);
   }, []);
