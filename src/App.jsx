@@ -1469,13 +1469,16 @@ async function fetchData() {
                   {/* Submit button */}
                   {!isLocked && (
                     <div style={{ padding: 16 }}>
-                    <button disabled={totalStaged < 5} onClick={() => {
+                      <button disabled={totalStaged < 5} onClick={() => {
                         if (totalStaged < 5) return;
+                        const golferList = contestPickStaging.map(p => p.golfer_name).join(", ");
+                        const confirmed = window.confirm(`Confirm your 5 picks:\n\n${golferList}\n\nClick OK to enter your tiebreaker score.`);
+                        if (!confirmed) return;
                         setPendingContestPicks(contestPickStaging);
                         setTiebreakerTournament(activeTournament);
                         setTiebreakerValue("");
                         setShowTiebreakerModal(true);
-                      }} style={{ width: "100%", background: totalStaged >= 5 ? BILLS_RED : "rgba(255,255,255,0.06)", border: "none", borderRadius: 12, padding: "14px", color: totalStaged >= 5 ? BILLS_WHITE : "#475569", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, cursor: totalStaged >= 5 ? "pointer" : "default", letterSpacing: "0.04em" }}>
+                      }}style={{ width: "100%", background: totalStaged >= 5 ? BILLS_RED : "rgba(255,255,255,0.06)", border: "none", borderRadius: 12, padding: "14px", color: totalStaged >= 5 ? BILLS_WHITE : "#475569", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, cursor: totalStaged >= 5 ? "pointer" : "default", letterSpacing: "0.04em" }}>
                         {totalStaged < 5 ? `Select ${5 - totalStaged} more to submit` : "⛳ Submit All 5 Picks →"}
                       </button>
                     </div>
