@@ -255,8 +255,17 @@ async function fetchData() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.log("Logout error:", e);
+    }
     setSession(null);
+    setLoggedInBagger(null);
+    setLoggedInMember(null);
+    setContestPickStaging([]);
+    setPicks([]);
+    setContestPicks([]);
   }
 
   async function uploadAvatar(baggerId, file) {
