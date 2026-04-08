@@ -114,6 +114,10 @@ export default function App() {
   const [contestPicks, setContestPicks] = useState([]);
   const [contestScores, setContestScores] = useState([]);
   const [contestPickStaging, setContestPickStaging] = useState([]);
+  const [showTiebreakerModal, setShowTiebreakerModal] = useState(false);
+  const [tiebreakerValue, setTiebreakerValue] = useState("");
+  const [pendingContestPicks, setPendingContestPicks] = useState([]);
+  const [tiebreakerTournament, setTiebreakerTournament] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -1465,16 +1469,12 @@ async function fetchData() {
                   {/* Submit button */}
                   {!isLocked && (
                     <div style={{ padding: 16 }}>
-                      <button disabled={totalStaged < 5} onClick={async () => {
+                    <button disabled={totalStaged < 5} onClick={() => {
                         if (totalStaged < 5) return;
-                        const golferList = contestPickStaging.map(p => p.golfer_name).join(", ");
-                        const confirmed = window.confirm(`Confirm your 5 picks:\n\n${golferList}\n\nOnce submitted you can still remove picks before the deadline.`);
-                        if (!confirmed) return;
-                        for (const pick of contestPickStaging) {
-                          await supabase.from("contest_picks").insert({ member_id: myMember.id, tournament_id: activeTournament.id, golfer_name: pick.golfer_name, datagolf_name: pick.datagolf_name });
-                        }
-                        setContestPickStaging([]);
-                        await fetchData();
+                        setPendingContestPicks(contestPickStaging);
+                        setTiebreakerTournament(activeTournament);
+                        setTiebreakerValue("");
+                        setShowTiebreakerModal(true);
                       }} style={{ width: "100%", background: totalStaged >= 5 ? BILLS_RED : "rgba(255,255,255,0.06)", border: "none", borderRadius: 12, padding: "14px", color: totalStaged >= 5 ? BILLS_WHITE : "#475569", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 700, cursor: totalStaged >= 5 ? "pointer" : "default", letterSpacing: "0.04em" }}>
                         {totalStaged < 5 ? `Select ${5 - totalStaged} more to submit` : "⛳ Submit All 5 Picks →"}
                       </button>
@@ -1491,6 +1491,95 @@ async function fetchData() {
                 </div>
               );
             })()}
+          </div>
+        )}
+
+{/* ── TIEBREAKER MODAL ── */}
+        {showTiebreakerModal && tiebreakerTournament && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+            onClick={e => { if (e.target === e.currentTarget) setShowTiebreakerModal(false); }}>
+            <div style={{ background: "#071128", border: `1px solid ${BORDER}`, borderRadius: 20, width: "100%", maxWidth: 420, overflow: "hidden" }}>
+
+              {/* Tournament logo header */}
+              <div style={{ background: "rgba(0,51,141,0.2)", padding: "28px 24px", textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
+                {tiebreakerTournament.logo_url ? (
+                  <img src={tiebreakerTournament.logo_url} alt={tiebreakerTournament.name}
+                    style={{ maxHeight: 80, maxWidth: 200, objectFit: "contain", marginBottom: 16 }} />
+                ) : (
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
+                )}
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, color: BILLS_WHITE, marginBottom: 4 }}>{tiebreakerTournament.name}</div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>Tiebreaker Entry</div>
+              </div>
+
+              <div style={{ padding: 28 }}>
+                {/* Selected picks summary */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, color: "#64748b", letterSpacing: "0.08em", marginBottom: 10 }}>YOUR 5 PICKS</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {pendingContestPicks.map(pick => (
+                      <span key={pick.golfer_name} style={{ fontSize: 12, background: "rgba(198,12,48,0.1)", border: "1px solid rgba(198,12,48,0.25)", borderRadius: 20, padding: "4px 12px", color: BILLS_WHITE }}>
+                        {pick.golfer_name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tiebreaker input */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 13, color: BILLS_WHITE, fontWeight: 600, marginBottom: 6 }}>Winning Score (Relative to Par)</div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>Enter your prediction for the winning score (e.g. -18 for 18 under par). Used as tiebreaker only.</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => setTiebreakerValue(prev => prev === "" ? "-1" : String(Number(prev) - 1))}
+                        style={{ width: 40, height: 40, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, color: BILLS_WHITE, fontSize: 20, cursor: "pointer" }}>−</button>
+                      <input
+                        type="number"
+                        value={tiebreakerValue}
+                        onChange={e => setTiebreakerValue(e.target.value)}
+                        placeholder="e.g. -18"
+                        style={{ width: 100, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "10px 14px", color: BILLS_WHITE, fontSize: 18, fontFamily: "'DM Mono', monospace", outline: "none", textAlign: "center" }} />
+                      <button onClick={() => setTiebreakerValue(prev => prev === "" ? "1" : String(Number(prev) + 1))}
+                        style={{ width: 40, height: 40, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 8, color: BILLS_WHITE, fontSize: 20, cursor: "pointer" }}>+</button>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#64748b" }}>
+                      {tiebreakerValue !== "" ? (Number(tiebreakerValue) < 0 ? `${tiebreakerValue} under par` : Number(tiebreakerValue) === 0 ? "Even par" : `+${tiebreakerValue} over par`) : ""}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Buttons */}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => setShowTiebreakerModal(false)}
+                    style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}`, borderRadius: 10, padding: "12px", color: "#64748b", fontFamily: "'DM Sans', sans-serif", fontSize: 14, cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                  <button
+                    disabled={tiebreakerValue === ""}
+                    onClick={async () => {
+                      const myMember = contestMembers.find(cm => cm.email?.toLowerCase() === session?.user?.email?.toLowerCase());
+                      if (!myMember) return;
+                      for (const pick of pendingContestPicks) {
+                        await supabase.from("contest_picks").insert({
+                          member_id: myMember.id,
+                          tournament_id: tiebreakerTournament.id,
+                          golfer_name: pick.golfer_name,
+                          datagolf_name: pick.datagolf_name,
+                          tiebreaker: Number(tiebreakerValue),
+                        });
+                      }
+                      setContestPickStaging([]);
+                      setShowTiebreakerModal(false);
+                      setTiebreakerValue("");
+                      setPendingContestPicks([]);
+                      await fetchData();
+                    }}
+                    style={{ flex: 2, background: tiebreakerValue !== "" ? BILLS_RED : "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, padding: "12px", color: tiebreakerValue !== "" ? BILLS_WHITE : "#475569", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, cursor: tiebreakerValue !== "" ? "pointer" : "default" }}>
+                    ⛳ Submit Picks & Tiebreaker →
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
