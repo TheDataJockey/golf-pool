@@ -1254,7 +1254,14 @@ async function fetchData() {
                     <div style={{ display: "flex", alignItems: "center", padding: m ? "10px 16px" : "12px 24px", background: i === 0 && s.total > 0 ? "rgba(198,12,48,0.06)" : "transparent", gap: 12 }}>
                       <div style={{ width: 24, fontFamily: "'DM Mono', monospace", fontSize: 12, color: i === 0 ? BILLS_RED : "#475569" }}>#{i + 1}</div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, color: BILLS_WHITE, fontWeight: i === 0 ? 600 : 400 }}>{s.member.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ fontSize: 14, color: BILLS_WHITE, fontWeight: i === 0 ? 600 : 400 }}>{s.member.name}</div>
+                          {s.enrichedPicks[0]?.tiebreaker !== undefined && s.enrichedPicks[0]?.tiebreaker !== null && (
+                            <span style={{ fontSize: 10, background: "rgba(0,51,141,0.3)", border: `1px solid ${BORDER}`, borderRadius: 20, padding: "2px 8px", color: "#64748b" }}>
+                              TB: {s.enrichedPicks[0].tiebreaker > 0 ? `+${s.enrichedPicks[0].tiebreaker}` : s.enrichedPicks[0].tiebreaker}
+                            </span>
+                          )}
+                        </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
                           {s.enrichedPicks.map(g => (
                             <span key={g.golfer_name} style={{ fontSize: 10, background: "rgba(0,51,141,0.2)", border: `1px solid ${BORDER}`, borderRadius: 20, padding: "2px 8px", color: "#94a3b8" }}>
@@ -1399,7 +1406,16 @@ async function fetchData() {
                   {/* Submitted picks */}
                   {myContestPicks.length > 0 && (
                     <div style={{ padding: "12px 20px", borderBottom: `1px solid ${BORDER}` }}>
-                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>✅ SUBMITTED</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>✅ SUBMITTED</div>
+                        {myContestPicks[0]?.tiebreaker !== undefined && myContestPicks[0]?.tiebreaker !== null && (
+                          <div style={{ fontSize: 11, color: "#64748b" }}>
+                            Tiebreaker: <span style={{ color: BILLS_WHITE, fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>
+                              {myContestPicks[0].tiebreaker > 0 ? `+${myContestPicks[0].tiebreaker}` : myContestPicks[0].tiebreaker}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {myContestPicks.map(pick => (
                           <div key={pick.id} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 20, padding: "4px 12px" }}>
@@ -1467,13 +1483,14 @@ async function fetchData() {
                   )}
 
                   {/* Submit button */}
-                  {!isLocked && (
+                   {!isLocked && myContestPicks.length < 5 && (
                     <div style={{ padding: 16 }}>
                       <button disabled={totalStaged < 5} onClick={() => {
                         if (totalStaged < 5) return;
                         const golferList = contestPickStaging.map(p => p.golfer_name).join(", ");
                         const confirmed = window.confirm(`Confirm your 5 picks:\n\n${golferList}\n\nClick OK to enter your tiebreaker score.`);
                         if (!confirmed) return;
+                        console.log("Setting tiebreaker modal, activeTournament:", activeTournament?.name);
                         setPendingContestPicks(contestPickStaging);
                         setTiebreakerTournament(activeTournament);
                         setTiebreakerValue("");
