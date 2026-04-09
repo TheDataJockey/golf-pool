@@ -1334,8 +1334,8 @@ async function fetchData() {
                     const fp = field.find(f => f.player_name === pick.golfer_name || f.datagolf_name === pick.datagolf_name);
                     const owgr = fp?.owgr_rank || null;
                     const weighting = !owgr ? 0 : owgr <= 15 ? 5 : owgr <= 30 ? 3 : owgr <= 45 ? 0 : owgr <= 60 ? -3 : -5;
-                    const latestScore = contestScores.find(s => s.member_id === member.id && s.golfer_name === pick.golfer_name && s.tournament_id === activeTournament.id);
-                    const position = latestScore?.finish_position || 0;
+                    const livePick = picks.find(p => p.datagolf_name === pick.datagolf_name && p.tournaments?.week_number === activeTournament.week_number);
+                    const position = livePick?.finish_position || 0;
                     const netPoints = position > 0 ? position + weighting : 0;
                     return { ...pick, owgr, weighting, position, netPoints };
                   }).sort((a, b) => { if (a.netPoints && b.netPoints) return a.netPoints - b.netPoints; return (a.owgr || 999) - (b.owgr || 999); });
