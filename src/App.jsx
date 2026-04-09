@@ -181,8 +181,10 @@ export default function App() {
   useEffect(() => {
     if (!session || page !== "contest") return;
     setContestPickStaging([]);
+    refreshLivePositions();
     fetchData();
     const interval = setInterval(() => {
+      refreshLivePositions();
       fetchData();
     }, 60000);
     return () => clearInterval(interval);
