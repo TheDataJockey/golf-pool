@@ -232,10 +232,12 @@ async function fetchData() {
   }
 
   async function refreshLivePositions() {
+    const now = new Date();
     const current = tournaments.find(t => {
-      const s = new Date(t.start_date), e = new Date(t.end_date);
-      e.setDate(e.getDate() + 1);
-      return new Date() >= s && new Date() <= e;
+      if (!t.start_date || !t.end_date) return false;
+      const s = new Date(t.start_date + 'T00:00:00');
+      const e = new Date(t.end_date + 'T23:59:59');
+      return now >= s && now <= e;
     });
     if (current) {
       await fetch("https://iijfldracspwgezcwhtg.supabase.co/functions/v1/get-live-positions", {
