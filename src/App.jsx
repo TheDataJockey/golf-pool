@@ -658,8 +658,8 @@ async function fetchData() {
                   ))}
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 70px" : "60px 1fr 80px 100px", gap: m ? 8 : 16, padding: "10px 16px", borderBottom: `1px solid rgba(0,51,141,0.15)` }}>
-                {(m ? ["OWGR", "PLAYER", "STATUS"] : ["OWGR", "PLAYER", "STATUS", "PICKED BY"]).map(h => (
+              <div style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 60px 60px" : "60px 1fr 70px 60px 60px 60px 60px 60px 100px", gap: m ? 6 : 12, padding: "10px 16px", borderBottom: `1px solid rgba(0,51,141,0.15)` }}>
+                {(m ? ["OWGR", "PLAYER", "POS", "TOT"] : ["OWGR", "PLAYER", "POS", "TOT", "R1", "R2", "R3", "R4", "PICKED BY"]).map(h => (
                   <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: "0.08em", fontWeight: 600 }}>{h}</div>
                 ))}
               </div>
@@ -678,13 +678,33 @@ async function fetchData() {
                   else if (fieldSort === "picked") displayField.sort((a, b) => { if (a.pickedBy && !b.pickedBy) return -1; if (!a.pickedBy && b.pickedBy) return 1; return 0; });
                   if (displayField.length === 0) return <div style={{ padding: 40, textAlign: "center", color: "#475569", fontSize: 14 }}>No golfers found</div>;
                   return displayField.map((player, i) => (
-                    <div key={player.id} style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 70px" : "60px 1fr 80px 100px", gap: m ? 8 : 16, padding: m ? "8px 16px" : "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.06)`, background: player.pickedBy ? "rgba(198,12,48,0.05)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", alignItems: "center" }}>
+                  <div key={player.id} style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 60px 60px" : "60px 1fr 70px 60px 60px 60px 60px 60px 100px", gap: m ? 6 : 12, padding: m ? "8px 16px" : "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.06)`, background: player.pickedBy ? "rgba(198,12,48,0.05)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", alignItems: "center" }}>
                       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: m ? 11 : 12, color: !player.owgr_rank ? "#334155" : player.owgr_rank <= 10 ? BILLS_RED : player.owgr_rank <= 50 ? "#4a90d9" : "#475569" }}>{player.owgr_rank ? `#${player.owgr_rank}` : "—"}</div>
                       <div style={{ fontSize: m ? 12 : 13, color: player.pickedBy ? BILLS_WHITE : "#94a3b8", fontWeight: player.pickedBy ? 600 : 400 }}>{player.player_name}{player.amateur && <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(A)</span>}</div>
-                      <div style={{ fontSize: 10 }}>
-                        {!player.owgr_rank ? <span style={{ color: "#334155" }}>Field</span> : player.owgr_rank <= 10 ? <span style={{ color: BILLS_RED, fontWeight: 600 }}>Top 10</span> : player.owgr_rank <= 50 ? <span style={{ color: "#4a90d9" }}>Top 50</span> : player.owgr_rank <= 100 ? <span style={{ color: "#64748b" }}>Top 100</span> : <span style={{ color: "#334155" }}>Field</span>}
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.current_position <= 10 ? BILLS_RED : "#64748b" }}>
+                        {player.current_position ? `T${player.current_position}` : "—"}
                       </div>
-                      {!m && <div style={{ fontSize: 12, color: BILLS_RED, fontWeight: 600 }}>{player.pickedBy || ""}</div>}
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.total_to_par < 0 ? "#22c55e" : player.total_to_par > 0 ? "#ef4444" : "#64748b" }}>
+                        {player.total_to_par !== null && player.total_to_par !== undefined ? (player.total_to_par > 0 ? `+${player.total_to_par}` : player.total_to_par === 0 ? "E" : player.total_to_par) : "—"}
+                      </div>
+                      {!m && <>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.r1 < 0 ? "#22c55e" : player.r1 > 0 ? "#ef4444" : "#64748b" }}>
+                          {player.r1 !== null && player.r1 !== undefined ? (player.r1 > 0 ? `+${player.r1}` : player.r1 === 0 ? "E" : player.r1) : "—"}
+                        </div>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.r2 < 0 ? "#22c55e" : player.r2 > 0 ? "#ef4444" : "#64748b" }}>
+                          {player.r2 !== null && player.r2 !== undefined ? (player.r2 > 0 ? `+${player.r2}` : player.r2 === 0 ? "E" : player.r2) : "—"}
+                        </div>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.r3 < 0 ? "#22c55e" : player.r3 > 0 ? "#ef4444" : "#64748b" }}>
+                          {player.r3 !== null && player.r3 !== undefined ? (player.r3 > 0 ? `+${player.r3}` : player.r3 === 0 ? "E" : player.r3) : "—"}
+                        </div>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.r4 < 0 ? "#22c55e" : player.r4 > 0 ? "#ef4444" : "#64748b" }}>
+                          {player.r4 !== null && player.r4 !== undefined ? (player.r4 > 0 ? `+${player.r4}` : player.r4 === 0 ? "E" : player.r4) : "—"}
+                        </div>
+                        <div style={{ fontSize: 12, color: BILLS_RED, fontWeight: 600 }}>{player.pickedBy || ""}</div>
+                      </>}
+                      {m && <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.total_to_par < 0 ? "#22c55e" : "#64748b" }}>
+                        {player.current_position ? `T${player.current_position}` : "—"}
+                      </div>}
                     </div>
                   ));
                 })()}
