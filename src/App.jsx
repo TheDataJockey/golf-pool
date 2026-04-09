@@ -658,17 +658,14 @@ async function fetchData() {
                   ))}
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 60px 50px" : "60px 1fr 60px 55px 55px 55px 55px 55px 55px 100px", gap: m ? 6 : 10, padding: "10px 16px", borderBottom: `1px solid rgba(0,51,141,0.15)` }}>
+<div style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 60px 50px" : "60px 1fr 60px 55px 55px 55px 55px 55px 55px 100px", gap: m ? 6 : 10, padding: "10px 16px", borderBottom: `1px solid rgba(0,51,141,0.15)`, alignItems: "center" }}>
                 {(m ? ["OWGR", "PLAYER", "POS", "TOT"] : ["OWGR", "PLAYER", "POS", "TOT", "THRU", "R1", "R2", "R3", "R4", "PICKED BY"]).map(h => (
                   <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: "0.08em", fontWeight: 600, textAlign: h === "OWGR" || h === "PLAYER" ? "left" : "center" }}>{h}</div>
                 ))}
               </div>
               <div style={{ maxHeight: m ? 500 : 600, overflowY: "auto" }}>
                 {(() => {
-                  const currentWeek = tournaments.find(t => {
-                    const s = new Date(t.start_date), e = new Date(t.end_date);
-                    return s <= today && e >= today;
-                  });
+                  const currentWeek = tournaments.find(t => { const s = new Date(t.start_date), e = new Date(t.end_date); return s <= today && e >= today; });
                   let displayField = field.filter(p => p.player_name.toLowerCase().includes(fieldSearch.toLowerCase())).map(player => {
                     const pickedBy = currentWeek ? picks.filter(p => p.tournaments?.week_number === currentWeek.week_number && p.golfer_name?.toLowerCase() === player.player_name?.toLowerCase()).map(p => p.baggers?.name).join(", ") : "";
                     return { ...player, pickedBy };
@@ -678,7 +675,7 @@ async function fetchData() {
                   else if (fieldSort === "picked") displayField.sort((a, b) => { if (a.pickedBy && !b.pickedBy) return -1; if (!a.pickedBy && b.pickedBy) return 1; return 0; });
                   if (displayField.length === 0) return <div style={{ padding: 40, textAlign: "center", color: "#475569", fontSize: 14 }}>No golfers found</div>;
                   return displayField.map((player, i) => (
-                 <div key={player.id} style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 60px 50px" : "60px 1fr 60px 55px 55px 55px 55px 55px 55px 100px", gap: m ? 6 : 10, padding: m ? "8px 16px" : "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.06)`, background: player.pickedBy ? "rgba(198,12,48,0.05)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", alignItems: "center" }}>
+                    <div key={player.id} style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 60px 50px" : "60px 1fr 60px 55px 55px 55px 55px 55px 55px 100px", gap: m ? 6 : 10, padding: m ? "8px 16px" : "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.06)`, background: player.pickedBy ? "rgba(198,12,48,0.05)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", alignItems: "center" }}>
                       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: m ? 11 : 12, color: !player.owgr_rank ? "#334155" : player.owgr_rank <= 10 ? BILLS_RED : player.owgr_rank <= 50 ? "#4a90d9" : "#475569" }}>{player.owgr_rank ? `#${player.owgr_rank}` : "—"}</div>
                       <div style={{ fontSize: m ? 12 : 13, color: player.pickedBy ? BILLS_WHITE : "#94a3b8", fontWeight: player.pickedBy ? 600 : 400 }}>{player.player_name}{player.amateur && <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(A)</span>}</div>
                       <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.current_position && player.current_position <= 10 ? BILLS_RED : "#64748b", textAlign: "center" }}>
@@ -691,7 +688,7 @@ async function fetchData() {
                         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#64748b", textAlign: "center" }}>
                           {player.thru !== null && player.thru !== undefined ? (player.thru === 18 ? "F" : `${player.thru}`) : "—"}
                         </div>
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.r1 < 0 ? "#22c55e" : player.r1 > 0 ? "#ef4444" : "#64748b", textAlign: "center" }}>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.r1 !== null && player.r1 < 0 ? "#22c55e" : player.r1 > 0 ? "#ef4444" : "#64748b", textAlign: "center" }}>
                           {player.r1 !== null && player.r1 !== undefined ? (player.r1 > 0 ? `+${player.r1}` : player.r1 === 0 ? "E" : player.r1) : "—"}
                         </div>
                         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.r2 !== null && player.r2 < 0 ? "#22c55e" : player.r2 > 0 ? "#ef4444" : "#64748b", textAlign: "center" }}>
@@ -703,14 +700,12 @@ async function fetchData() {
                         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: player.r4 !== null && player.r4 < 0 ? "#22c55e" : player.r4 > 0 ? "#ef4444" : "#64748b", textAlign: "center" }}>
                           {player.r4 !== null && player.r4 !== undefined ? (player.r4 > 0 ? `+${player.r4}` : player.r4 === 0 ? "E" : player.r4) : "—"}
                         </div>
-                        <div style={{ fontSize: 12, color: BILLS_RED, fontWeight: 600 }}>{player.pickedBy || ""}</div>
+                        <div style={{ fontSize: 12, color: BILLS_RED, fontWeight: 600, textAlign: "center" }}>{player.pickedBy || ""}</div>
                       </>}
                     </div>
                   ));
                 })()}
               </div>
-            </div>
-          </div>
         )}
 
         {/* ── MY PICK ── */}
