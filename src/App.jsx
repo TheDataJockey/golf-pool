@@ -706,6 +706,8 @@ async function fetchData() {
                   ));
                 })()}
               </div>
+            </div>
+          </div>
         )}
 
         {/* ── MY PICK ── */}
