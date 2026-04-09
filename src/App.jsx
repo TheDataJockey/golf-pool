@@ -658,7 +658,7 @@ async function fetchData() {
                   ))}
                 </div>
               </div>
-<div style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 60px 50px" : "60px 1fr 60px 55px 55px 55px 55px 55px 55px 100px", gap: m ? 6 : 10, padding: "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.15)`, alignItems: "center" }}>
+<div style={{ display: "grid", gridTemplateColumns: m ? "50px 1fr 60px 50px" : "60px 200px 60px 55px 55px 55px 55px 55px 55px 120px", gap: m ? 6 : 10, padding: "10px 24px", borderBottom: `1px solid rgba(0,51,141,0.15)`, alignItems: "center" }}>
                 {(m ? ["OWGR", "PLAYER", "POS", "TOT"] : ["OWGR", "PLAYER", "POS", "TOT", "THRU", "R1", "R2", "R3", "R4", "PICKED BY"]).map(h => (
                   <div key={h} style={{ fontSize: 10, color: "#475569", letterSpacing: "0.08em", fontWeight: 600, textAlign: h === "OWGR" || h === "PLAYER" ? "left" : "center" }}>{h}</div>
                 ))}
