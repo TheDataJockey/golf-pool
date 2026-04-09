@@ -1334,11 +1334,10 @@ async function fetchData() {
                     const fp = field.find(f => f.player_name === pick.golfer_name || f.datagolf_name === pick.datagolf_name);
                     const owgr = fp?.owgr_rank || null;
                     const weighting = !owgr ? 0 : owgr <= 15 ? 5 : owgr <= 30 ? 3 : owgr <= 45 ? 0 : owgr <= 60 ? -3 : -5;
-                    const livePick = picks.find(p => 
-                      (pick.datagolf_name && p.datagolf_name === pick.datagolf_name || p.golfer_name === pick.golfer_name) && 
-                      p.tournaments?.week_number === activeTournament.week_number
+                    const liveField = field.find(f => 
+                      f.datagolf_name === pick.datagolf_name || f.player_name === pick.golfer_name
                     );
-                    const position = livePick?.finish_position || 0;
+                    const position = liveField?.current_position || 0;
                     const netPoints = position > 0 ? position + weighting : 0;
                     return { ...pick, owgr, weighting, position, netPoints };
                   }).sort((a, b) => { if (a.netPoints && b.netPoints) return a.netPoints - b.netPoints; return (a.owgr || 999) - (b.owgr || 999); });
