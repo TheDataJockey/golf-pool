@@ -124,6 +124,16 @@ function Avatar({ bagger, size = 40, i = 0 }) {
   );
 }
 
+// ── Date helper ───────────────────────────────────────────
+// Compares now against end_datetime (timestamptz stored as 23:59:59 ET).
+// Falls back to end_date + 1 day if end_datetime not yet populated.
+function tournamentEnd(t) {
+  if (t.end_datetime) return new Date(t.end_datetime);
+  const d = new Date(t.end_date + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
 // ── Mookie's Pool scoring helper ───────────────────────────
 // Given a player's OWGR rank, returns the point weighting
 // applied to their finish position:
@@ -446,7 +456,7 @@ export default function App() {
     const current = tournaments.find(t => {
       if (!t.start_date || !t.end_date) return false;
       const s = new Date(t.start_date + 'T00:00:00');
-      const e = new Date(t.end_date   + 'T23:59:59');
+      const e = tournamentEnd(t);
       return now >= s && now <= e;
     });
     if (current) {
@@ -873,16 +883,16 @@ export default function App() {
               // Find active pool tournament first, fall back to any active tournament
               const current =
                 tournaments.find(t => {
-                  const s = new Date(t.start_date), e = new Date(t.end_date);
+                  const s = new Date(t.start_date + 'T00:00:00'), e = tournamentEnd(t);
                   return s <= today && e >= today && t.is_pool_event !== false;
                 }) ||
                 tournaments.find(t => {
-                  const s = new Date(t.start_date), e = new Date(t.end_date);
+                  const s = new Date(t.start_date + 'T00:00:00'), e = tournamentEnd(t);
                   return s <= today && e >= today;
                 });
               const upcoming = !current && tournaments.find(t => {
                 if (!t.start_date) return false;
-                const s = new Date(t.start_date);
+                const s = new Date(t.start_date + 'T00:00:00');
                 return s > today && t.is_pool_event !== false;
               });
               const display = current || upcoming;
@@ -961,10 +971,10 @@ export default function App() {
                   // Match the current pool tournament — exclude companion events (is_pool_event = false)
                   // Falls back to any active tournament if is_pool_event column not yet set
                   const currentWeek = tournaments.find(t => {
-                    const s = new Date(t.start_date), e = new Date(t.end_date);
+                    const s = new Date(t.start_date + 'T00:00:00'), e = tournamentEnd(t);
                     return s <= today && e >= today && t.is_pool_event !== false;
                   }) || tournaments.find(t => {
-                    const s = new Date(t.start_date), e = new Date(t.end_date);
+                    const s = new Date(t.start_date + 'T00:00:00'), e = tournamentEnd(t);
                     return s <= today && e >= today;
                   });
                   // Annotate each field player with who (if anyone) picked them this week
@@ -1048,15 +1058,15 @@ export default function App() {
               // Find active (in-progress) tournament
               const activeTournament = tournaments.find(t => {
                 if (!t.start_date || !t.end_date) return false;
-                const s = new Date(t.start_date + 'T00:00:00Z');
-                const e = new Date(t.end_date   + 'T23:59:59Z');
+                const s = new Date(t.start_date + 'T00:00:00');
+                const e = tournamentEnd(t);
                 return now >= s && now <= e;
               });
 
               // Find next tournament where picks are open (Mon→Thu window)
               const nextPickableTournament = tournaments.find(t => {
                 if (!t.start_date || !t.pick_deadline) return false;
-                const s        = new Date(t.start_date);
+                const s        = new Date(t.start_date + 'T00:00:00');
                 const deadline = new Date(t.pick_deadline);
                 const monday   = new Date(s);
                 monday.setDate(s.getDate() - 3);
@@ -1543,8 +1553,8 @@ export default function App() {
               </div>
             )}
             {tournaments.map(t => {
-              const startDate  = t.start_date ? new Date(t.start_date) : null;
-              const endDate    = t.end_date   ? new Date(t.end_date)   : null;
+              const startDate  = t.start_date ? new Date(t.start_date + 'T00:00:00') : null;
+              const endDate    = t.end_date   ? tournamentEnd(t) : null;
               const isCompleted= endDate && endDate < today;
               const isCurrent  = startDate && endDate && startDate <= today && endDate >= today;
               const isUpcoming = startDate && startDate > today;
@@ -1723,12 +1733,12 @@ export default function App() {
               {(() => {
                 // Determine the active or upcoming tournament
                 const activeTournament = tournaments.find(t => {
-                  const s = new Date(t.start_date + 'T00:00:00Z');
-                  const e = new Date(t.end_date   + 'T23:59:59Z');
+                  const s = new Date(t.start_date + 'T00:00:00');
+                  const e = tournamentEnd(t);
                   return new Date() >= s && new Date() <= e;
                 }) || tournaments.find(t => {
                   if (!t.start_date || !t.pick_deadline) return false;
-                  const s        = new Date(t.start_date);
+                  const s        = new Date(t.start_date + 'T00:00:00');
                   const deadline = new Date(t.pick_deadline);
                   const monday   = new Date(s); monday.setDate(s.getDate() - 3); monday.setHours(11, 0, 0, 0);
                   return new Date() >= monday && new Date() < deadline;
@@ -1803,12 +1813,12 @@ export default function App() {
               </div>
               {(() => {
                 const activeTournament = tournaments.find(t => {
-                  const s = new Date(t.start_date + 'T00:00:00Z');
-                  const e = new Date(t.end_date   + 'T23:59:59Z');
+                  const s = new Date(t.start_date + 'T00:00:00');
+                  const e = tournamentEnd(t);
                   return new Date() >= s && new Date() <= e;
                 }) || tournaments.find(t => {
                   if (!t.start_date || !t.pick_deadline) return false;
-                  const s        = new Date(t.start_date);
+                  const s        = new Date(t.start_date + 'T00:00:00');
                   const deadline = new Date(t.pick_deadline);
                   const monday   = new Date(s); monday.setDate(s.getDate() - 3); monday.setHours(11, 0, 0, 0);
                   return new Date() >= monday && new Date() < deadline;
@@ -1904,12 +1914,12 @@ export default function App() {
                 Shows 5/5 completion indicator. */}
             {(() => {
               const activeTournament = tournaments.find(t => {
-                const s = new Date(t.start_date + 'T00:00:00Z');
-                const e = new Date(t.end_date   + 'T23:59:59Z');
+                const s = new Date(t.start_date + 'T00:00:00');
+                const e = tournamentEnd(t);
                 return new Date() >= s && new Date() <= e;
               }) || tournaments.find(t => {
                 if (!t.start_date || !t.pick_deadline) return false;
-                const s        = new Date(t.start_date);
+                const s        = new Date(t.start_date + 'T00:00:00');
                 const deadline = new Date(t.pick_deadline);
                 const monday   = new Date(s); monday.setDate(s.getDate() - 3); monday.setHours(11, 0, 0, 0);
                 return new Date() >= monday && new Date() < deadline;
