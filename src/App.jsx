@@ -870,13 +870,16 @@ export default function App() {
 
             {/* Tournament banner — shows for active OR upcoming tournament, pool events only */}
             {(() => {
-              const current = tournaments.find(t => {
-                const s = new Date(t.start_date), e = new Date(t.end_date);
-                return s <= today && e >= today && t.is_pool_event !== false;
-              }) || tournaments.find(t => {
-                const s = new Date(t.start_date), e = new Date(t.end_date);
-                return s <= today && e >= today;
-              });
+              // Find active pool tournament first, fall back to any active tournament
+              const current =
+                tournaments.find(t => {
+                  const s = new Date(t.start_date), e = new Date(t.end_date);
+                  return s <= today && e >= today && t.is_pool_event !== false;
+                }) ||
+                tournaments.find(t => {
+                  const s = new Date(t.start_date), e = new Date(t.end_date);
+                  return s <= today && e >= today;
+                });
               const upcoming = !current && tournaments.find(t => {
                 if (!t.start_date) return false;
                 const s = new Date(t.start_date);
