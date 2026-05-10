@@ -282,7 +282,7 @@ export default function App() {
 
   // ── This Week / My Pick search+sort ───────────────────
   const [fieldSearch,  setFieldSearch]  = useState("");
-  const [fieldSort,    setFieldSort]    = useState("owgr");
+  const [fieldSort,    setFieldSort]    = useState("position");
   const [searchPick,   setSearchPick]   = useState("");
   const [selectedPick, setSelectedPick] = useState("");
 
@@ -945,8 +945,8 @@ export default function App() {
                   style={{ width:"100%", background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 12px", color:BILLS_WHITE, fontSize:13, fontFamily:"'DM Sans', sans-serif", outline:"none", marginBottom:10, boxSizing:"border-box" }} />
                 <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                   {[
-                    { id:"owgr",     label:"World Ranking" },
                     { id:"position", label:"Leaderboard" },
+                    { id:"owgr",     label:"World Ranking" },
                     { id:"name",     label:"Name" },
                     { id:"picked",   label:"Picked By" },
                   ].map(s => (
