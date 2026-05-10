@@ -868,24 +868,45 @@ export default function App() {
         {page === "thisweek" && (
           <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-            {/* Active tournament banner */}
+            {/* Tournament banner — shows for active OR upcoming tournament, pool events only */}
             {(() => {
               const current = tournaments.find(t => {
                 const s = new Date(t.start_date), e = new Date(t.end_date);
+                return s <= today && e >= today && t.is_pool_event !== false;
+              }) || tournaments.find(t => {
+                const s = new Date(t.start_date), e = new Date(t.end_date);
                 return s <= today && e >= today;
               });
-              return current ? (
-                <div style={{ background:"rgba(198,12,48,0.08)", border:"1px solid rgba(198,12,48,0.25)", borderRadius:16, padding: m ? "16px" : "20px 28px" }}>
+              const upcoming = !current && tournaments.find(t => {
+                if (!t.start_date) return false;
+                const s = new Date(t.start_date);
+                return s > today && t.is_pool_event !== false;
+              });
+              const display = current || upcoming;
+              if (!display) return (
+                <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:16, padding:"20px" }}>
+                  <div style={{ fontSize:13, color:"#64748b" }}>No tournament currently in progress.</div>
+                </div>
+              );
+              const isLive = !!current;
+              const startDate = display.start_date ? new Date(display.start_date).toLocaleDateString("en-US", { month:"short", day:"numeric" }) : null;
+              const endDate   = display.end_date   ? new Date(display.end_date).toLocaleDateString("en-US",   { month:"short", day:"numeric" }) : null;
+              return (
+                <div style={{ background: isLive ? "rgba(198,12,48,0.08)" : "rgba(0,51,141,0.08)", border: isLive ? "1px solid rgba(198,12,48,0.25)" : `1px solid ${BORDER}`, borderRadius:16, padding: m ? "16px" : "20px 28px" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
                     <div>
-                      <div style={{ fontSize:11, color:BILLS_RED, letterSpacing:"0.1em", fontWeight:700, marginBottom:6 }}>🔴 LIVE THIS WEEK</div>
-                      <div style={{ fontFamily:"'Playfair Display', serif", fontSize: m ? 18 : 22, color:BILLS_WHITE, marginBottom:4 }}>{current.name}</div>
-                      <div style={{ fontSize:12, color:"#64748b" }}>{current.course}</div>
+                      <div style={{ fontSize:11, color: isLive ? BILLS_RED : "#4a90d9", letterSpacing:"0.1em", fontWeight:700, marginBottom:6 }}>
+                        {isLive ? "🔴 LIVE THIS WEEK" : `📅 COMING UP — WEEK ${display.week_number}`}
+                      </div>
+                      <div style={{ fontFamily:"'Playfair Display', serif", fontSize: m ? 18 : 22, color:BILLS_WHITE, marginBottom:4 }}>{display.name}</div>
+                      <div style={{ fontSize:12, color:"#64748b" }}>
+                        {display.course}{startDate && endDate ? ` · ${startDate} – ${endDate}` : ""}
+                      </div>
                     </div>
                     <div style={{ display:"flex", gap:20 }}>
                       <div style={{ textAlign:"center" }}>
                         <div style={{ fontSize:11, color:"#475569", marginBottom:4 }}>PURSE</div>
-                        <div style={{ fontFamily:"'DM Mono', monospace", fontSize:15, color:"#4a90d9", fontWeight:700 }}>${(current.purse/1000000).toFixed(1)}M</div>
+                        <div style={{ fontFamily:"'DM Mono', monospace", fontSize:15, color:"#4a90d9", fontWeight:700 }}>${(display.purse/1000000).toFixed(1)}M</div>
                       </div>
                       <div style={{ textAlign:"center" }}>
                         <div style={{ fontSize:11, color:"#475569", marginBottom:4 }}>FIELD</div>
@@ -893,10 +914,6 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:16, padding:"20px" }}>
-                  <div style={{ fontSize:13, color:"#64748b" }}>No tournament currently in progress.</div>
                 </div>
               );
             })()}
@@ -915,10 +932,10 @@ export default function App() {
                   style={{ width:"100%", background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 12px", color:BILLS_WHITE, fontSize:13, fontFamily:"'DM Sans', sans-serif", outline:"none", marginBottom:10, boxSizing:"border-box" }} />
                 <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                   {[
-                    { id:"owgr",   label:"World Ranking" },
-                    { id:"name",   label:"Name" },
-                    { id:"status", label:"Status" },
-                    { id:"picked", label:"Picked By" },
+                    { id:"owgr",     label:"World Ranking" },
+                    { id:"position", label:"Leaderboard" },
+                    { id:"name",     label:"Name" },
+                    { id:"picked",   label:"Picked By" },
                   ].map(s => (
                     <button key={s.id} onClick={() => setFieldSort(s.id)}
                       style={{ background: fieldSort === s.id ? "rgba(198,12,48,0.15)" : "rgba(255,255,255,0.04)", border:`1px solid ${fieldSort === s.id ? "rgba(198,12,48,0.4)" : BORDER}`, borderRadius:8, padding:"5px 12px", color: fieldSort === s.id ? BILLS_RED : "#64748b", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontWeight: fieldSort === s.id ? 600 : 400 }}>
@@ -938,7 +955,12 @@ export default function App() {
               {/* Field rows */}
               <div style={{ maxHeight: m ? 500 : 600, overflowY:"auto" }}>
                 {(() => {
+                  // Match the current pool tournament — exclude companion events (is_pool_event = false)
+                  // Falls back to any active tournament if is_pool_event column not yet set
                   const currentWeek = tournaments.find(t => {
+                    const s = new Date(t.start_date), e = new Date(t.end_date);
+                    return s <= today && e >= today && t.is_pool_event !== false;
+                  }) || tournaments.find(t => {
                     const s = new Date(t.start_date), e = new Date(t.end_date);
                     return s <= today && e >= today;
                   });
@@ -956,8 +978,13 @@ export default function App() {
                     });
 
                   // Apply sort
-                  if (fieldSort === "name")   displayField.sort((a,b) => a.player_name.localeCompare(b.player_name));
-                  else if (fieldSort === "status") displayField.sort((a,b) => (a.owgr_rank || 999) - (b.owgr_rank || 999));
+                  if (fieldSort === "name")     displayField.sort((a,b) => a.player_name.localeCompare(b.player_name));
+                  else if (fieldSort === "position") displayField.sort((a,b) => {
+                    // Sort by current leaderboard position ascending; unscored players go to bottom
+                    const posA = a.current_position || 9999;
+                    const posB = b.current_position || 9999;
+                    return posA - posB;
+                  });
                   else if (fieldSort === "picked") displayField.sort((a,b) => {
                     if (a.pickedBy && !b.pickedBy) return -1;
                     if (!a.pickedBy && b.pickedBy) return 1;
@@ -1049,12 +1076,11 @@ export default function App() {
               const isLocked       = currentTournament.picks_locked || (deadline && new Date() > deadline);
               const myPicks        = picks.filter(p => p.baggers?.name === loggedInBagger?.name);
               const myCurrentPick  = myPicks.find(p => p.tournaments?.week_number === currentTournament.week_number);
-              // Hide golfers already used in prior weeks (once-per-season rule)
-              const myUsedGolfers  = myPicks.map(p => p.golfer_name?.toLowerCase());
-              const filteredField  = field.filter(p =>
-                !myUsedGolfers.includes(p.player_name.toLowerCase()) ||
-                p.player_name.toLowerCase() === myCurrentPick?.golfer_name?.toLowerCase()
-              );
+              // Golfers used in prior weeks (not current) — blocked from re-selection
+              const myPriorUsed    = myPicks
+                .filter(p => p.tournaments?.week_number !== currentTournament.week_number)
+                .map(p => p.golfer_name?.toLowerCase());
+              // Show ALL field players — used ones are color-coded, not hidden
               const myPriorPicks   = myPicks
                 .filter(p => p.tournaments?.week_number !== currentTournament.week_number)
                 .sort((a,b) => b.tournaments?.week_number - a.tournaments?.week_number);
@@ -1095,24 +1121,62 @@ export default function App() {
                         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
                           <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
                           <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>Week {currentTournament.week_number} — {currentTournament.name}</span>
-                          <span style={{ fontSize:11, color:"#475569", marginLeft:"auto" }}>{filteredField.length} available</span>
+                          <span style={{ fontSize:11, color:"#475569", marginLeft:"auto" }}>{field.filter(p => !myPriorUsed.includes(p.player_name.toLowerCase())).length} available</span>
                         </div>
                         <input value={searchPick} onChange={e => setSearchPick(e.target.value)} placeholder="Search golfers..."
                           style={{ width:"100%", background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 12px", color:BILLS_WHITE, fontSize:13, fontFamily:"'DM Sans', sans-serif", outline:"none", boxSizing:"border-box" }} />
+                        {/* Legend — fixed at top of list */}
+                        <div style={{ display:"flex", gap:12, marginTop:10, flexWrap:"wrap" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:"#94a3b8" }}>
+                            <div style={{ width:10, height:10, borderRadius:2, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)" }} />
+                            Available
+                          </div>
+                          <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:"#94a3b8" }}>
+                            <div style={{ width:10, height:10, borderRadius:2, background:"rgba(198,12,48,0.2)", border:"1px solid rgba(198,12,48,0.5)" }} />
+                            Selected
+                          </div>
+                          <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:"#94a3b8" }}>
+                            <div style={{ width:10, height:10, borderRadius:2, background:"rgba(100,116,139,0.15)", border:"1px solid rgba(100,116,139,0.3)" }} />
+                            Already used this season — cannot re-pick
+                          </div>
+                        </div>
                       </div>
                       <div style={{ maxHeight: m ? 300 : 480, overflowY:"auto" }}>
-                        {filteredField.length === 0
+                        {field.filter(p => p.player_name.toLowerCase().includes(searchPick.toLowerCase())).length === 0
                           ? <div style={{ padding:20, textAlign:"center", color:"#475569", fontSize:13 }}>No golfers found</div>
-                          : filteredField
+                          : field
                               .filter(p => p.player_name.toLowerCase().includes(searchPick.toLowerCase()))
                               .map((player, i) => {
-                                const isSelected = selectedPick === player.player_name;
+                                const isSelected  = selectedPick === player.player_name;
+                                const alreadyUsed = myPriorUsed.includes(player.player_name.toLowerCase());
+                                const isCurrentPick = player.player_name.toLowerCase() === myCurrentPick?.golfer_name?.toLowerCase();
+                                // Color scheme:
+                                //   red bg     = currently selected this session
+                                //   grey/muted = already used in a prior week (blocked)
+                                //   normal     = available to pick
+                                const rowBg = isSelected
+                                  ? "rgba(198,12,48,0.12)"
+                                  : alreadyUsed && !isCurrentPick
+                                    ? "rgba(100,116,139,0.08)"
+                                    : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent";
+                                const nameColor = isSelected
+                                  ? BILLS_WHITE
+                                  : alreadyUsed && !isCurrentPick
+                                    ? "#334155"
+                                    : "#94a3b8";
                                 return (
                                   <div key={player.id}
-                                    style={{ display:"flex", alignItems:"center", padding:"10px 16px", borderBottom:`1px solid rgba(0,51,141,0.08)`, background: isSelected ? "rgba(198,12,48,0.12)" : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", borderLeft: isSelected ? `3px solid ${BILLS_RED}` : "3px solid transparent", cursor: isLocked ? "default" : "pointer" }}
-                                    onClick={() => !isLocked && setSelectedPick(isSelected ? "" : player.player_name)}>
+                                    style={{ display:"flex", alignItems:"center", padding:"10px 16px", borderBottom:`1px solid rgba(0,51,141,0.08)`, background: rowBg, borderLeft: isSelected ? `3px solid ${BILLS_RED}` : alreadyUsed && !isCurrentPick ? "3px solid rgba(100,116,139,0.3)" : "3px solid transparent", cursor: isLocked || (alreadyUsed && !isCurrentPick) ? "default" : "pointer", opacity: alreadyUsed && !isCurrentPick ? 0.45 : 1 }}
+                                    onClick={() => {
+                                      if (isLocked) return;
+                                      if (alreadyUsed && !isCurrentPick) return; // block re-pick
+                                      setSelectedPick(isSelected ? "" : player.player_name);
+                                    }}>
                                     <div style={{ width:44, fontFamily:"'DM Mono', monospace", fontSize:11, color: !player.owgr_rank ? "#334155" : player.owgr_rank <= 10 ? BILLS_RED : player.owgr_rank <= 50 ? "#4a90d9" : "#475569" }}>{player.owgr_rank ? `#${player.owgr_rank}` : "—"}</div>
-                                    <div style={{ flex:1, fontSize:13, color: isSelected ? BILLS_WHITE : "#94a3b8", fontWeight: isSelected ? 600 : 400 }}>{player.player_name}</div>
+                                    <div style={{ flex:1, fontSize:13, color: nameColor, fontWeight: isSelected ? 600 : 400 }}>
+                                      {player.player_name}
+                                      {alreadyUsed && !isCurrentPick && <span style={{ fontSize:10, color:"#334155", marginLeft:6 }}>already used</span>}
+                                    </div>
                                     {isSelected && <div style={{ fontSize:13, color:BILLS_RED, fontWeight:700 }}>✓</div>}
                                   </div>
                                 );
