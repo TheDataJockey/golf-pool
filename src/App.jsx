@@ -817,7 +817,69 @@ export default function App() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,51,141,0.2)" />
                     <XAxis dataKey="week" tick={{ fill:"#64748b", fontSize: m ? 10 : 12 }} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={v => fmt(v)} tick={{ fill:"#64748b", fontSize:10 }} axisLine={false} tickLine={false} width={45} />
-                    <Tooltip formatter={v => fmtFull(v)} contentStyle={{ background:BG2, border:`1px solid ${BORDER}`, borderRadius:8, color:BILLS_WHITE }} />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        // Only show when hovering over a data point
+                        if (!active || !payload || !payload.length) return null;
+
+                        // Extract the week number from the label (e.g. "W14" → 14)
+                        const weekNum = parseInt(label?.replace("W", "")) || 0;
+
+                        // Find the tournament for this week
+                        const tourney = tournaments.find(t => t.week_number === weekNum);
+
+                        return (
+                          <div style={{ background:BG2, border:`1px solid ${BORDER}`, borderRadius:10, padding:"12px 16px", minWidth:200, maxWidth:280 }}>
+                            {/* Week + tournament name header */}
+                            <div style={{ fontSize:11, color:BILLS_RED, fontWeight:700, letterSpacing:"0.08em", marginBottom:4 }}>{label}</div>
+                            {tourney && (
+                              <div style={{ fontSize:11, color:"#64748b", marginBottom:10, borderBottom:`1px solid ${BORDER}`, paddingBottom:8 }}>
+                                {tourney.name}
+                              </div>
+                            )}
+                            {/* One row per bagger — sorted highest earnings first */}
+                            {[...payload]
+                              .sort((a, b) => (b.value || 0) - (a.value || 0))
+                              .map((entry) => {
+                                // Find this bagger's pick for this week
+                                const pick = picks.find(p =>
+                                  p.baggers?.name === entry.name &&
+                                  p.tournaments?.week_number === weekNum
+                                );
+                                return (
+                                  <div key={entry.name} style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:8, paddingBottom:8, borderBottom:`1px solid rgba(0,51,141,0.1)` }}>
+                                    {/* Color dot matching the line color */}
+                                    <div style={{ width:8, height:8, borderRadius:"50%", background:entry.color, flexShrink:0, marginTop:4 }} />
+                                    <div style={{ flex:1, minWidth:0 }}>
+                                      {/* Bagger name + earnings */}
+                                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
+                                        <span style={{ fontSize:12, color:BILLS_WHITE, fontWeight:600 }}>{entry.name}</span>
+                                        <span style={{ fontFamily:"'DM Mono', monospace", fontSize:12, color: (entry.value || 0) > 0 ? "#22c55e" : "#475569", fontWeight:700, flexShrink:0 }}>
+                                          {entry.value ? fmt(entry.value) : "—"}
+                                        </span>
+                                      </div>
+                                      {/* Golfer pick + finish position */}
+                                      {pick ? (
+                                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:2 }}>
+                                          <span style={{ fontSize:11, color:"#64748b" }}>{pick.golfer_name}</span>
+                                          {pick.finish_position ? (
+                                            <span style={{ fontSize:10, color: pick.finish_position === 80 ? BILLS_RED : pick.finish_position <= 10 ? "#22c55e" : "#475569", fontFamily:"'DM Mono', monospace" }}>
+                                              {pick.finish_position === 80 ? "CUT" : pick.finish_position === 1 ? "🏆 1st" : `T${pick.finish_position}`}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      ) : (
+                                        <div style={{ fontSize:11, color:"#334155", marginTop:2 }}>No pick</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            }
+                          </div>
+                        );
+                      }}
+                    />
                     <Legend wrapperStyle={{ color:"#94a3b8", fontSize: m ? 10 : 12 }} />
                     {baggers.map((b, i) => (
                       <Line key={b.name} type="monotone" dataKey={b.name} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
@@ -939,7 +1001,66 @@ export default function App() {
                     <div style={{ width:4, height:18, background:BILLS_RED, borderRadius:2 }} />
                     <span style={{ fontFamily:"'Playfair Display', serif", fontSize:15, color:BILLS_WHITE }}>This Week's Field</span>
                   </div>
-                  <div style={{ fontSize:11, color:"#475569" }}>{field.length} players</div>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ fontSize:11, color:"#475569" }}>{field.length} players</div>
+                    {/* Export to Excel button — builds a CSV with all field data and triggers download */}
+                    <button onClick={() => {
+                      // Define the columns to export
+                      const headers = [
+                        "Player Name", "Datagolf Name", "OWGR Rank", "Amateur",
+                        "Position", "Total To Par", "Thru", "R1", "R2", "R3", "R4",
+                        "Event Name", "Picked By"
+                      ];
+                      // Find the current tournament to look up picks
+                      const currentWeek = tournaments.find(t => {
+                        const s = new Date(t.start_date + 'T00:00:00');
+                        const e = tournamentEnd(t);
+                        return s <= today && e >= today && t.is_pool_event !== false;
+                      });
+                      // Build one row per player with all available data
+                      const rows = field.map(player => {
+                        const pickedBy = currentWeek
+                          ? picks
+                              .filter(p => p.tournaments?.week_number === currentWeek.week_number && p.golfer_name?.toLowerCase() === player.player_name?.toLowerCase())
+                              .map(p => p.baggers?.name)
+                              .join(", ")
+                          : "";
+                        // Format score columns — blank if null, "E" if even par
+                        const fmtScore = (v) => v === null || v === undefined ? "" : v === 0 ? "E" : v > 0 ? `+${v}` : String(v);
+                        const fmtPos   = (v) => v === null || v === undefined || v === 0 ? "" : v === 80 ? "CUT" : `T${v}`;
+                        return [
+                          player.player_name,
+                          player.datagolf_name,
+                          player.owgr_rank || "",
+                          player.amateur ? "Yes" : "No",
+                          fmtPos(player.current_position),
+                          fmtScore(player.total_to_par),
+                          player.thru === 18 ? "F" : player.thru || "",
+                          fmtScore(player.r1),
+                          fmtScore(player.r2),
+                          fmtScore(player.r3),
+                          fmtScore(player.r4),
+                          player.event_name || "",
+                          pickedBy,
+                        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
+                      });
+                      // Combine headers + rows into CSV string
+                      const csv      = [headers.join(","), ...rows].join("\n");
+                      const blob     = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                      const url      = URL.createObjectURL(blob);
+                      const link     = document.createElement("a");
+                      const filename = `${currentWeek?.name || "field"}_field_${new Date().toISOString().split("T")[0]}.csv`;
+                      link.setAttribute("href", url);
+                      link.setAttribute("download", filename);
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                    }}
+                      style={{ background:"rgba(0,51,141,0.2)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"5px 12px", color:"#94a3b8", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontWeight:600, display:"flex", alignItems:"center", gap:5 }}>
+                      📥 Export
+                    </button>
+                  </div>
                 </div>
                 <input value={fieldSearch} onChange={e => setFieldSearch(e.target.value)} placeholder="Search golfers..."
                   style={{ width:"100%", background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 12px", color:BILLS_WHITE, fontSize:13, fontFamily:"'DM Sans', sans-serif", outline:"none", marginBottom:10, boxSizing:"border-box" }} />
