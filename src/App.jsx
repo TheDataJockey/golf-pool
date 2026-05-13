@@ -1847,9 +1847,83 @@ export default function App() {
                 Gated: hidden until the logged-in member has submitted 5 picks.
                 Sorted: lowest net total first (best score = #1). */}
             <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:16, overflow:"hidden" }}>
-              <div style={{ padding:"14px 20px", borderBottom:`1px solid ${BORDER}`, display:"flex", alignItems:"center", gap:10 }}>
-                <div style={{ width:4, height:18, background:BILLS_RED, borderRadius:2 }} />
-                <span style={{ fontFamily:"'Playfair Display', serif", fontSize:15, color:BILLS_WHITE }}>Current Standings</span>
+              <div style={{ padding:"14px 20px", borderBottom:`1px solid ${BORDER}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ width:4, height:18, background:BILLS_RED, borderRadius:2 }} />
+                  <span style={{ fontFamily:"'Playfair Display', serif", fontSize:15, color:BILLS_WHITE }}>Current Standings</span>
+                </div>
+                {/* Export button — builds a CSV with all contestants, their picks,
+                    OWGR weighting, net points, and current ranking */}
+                <button onClick={() => {
+                  // Find the active tournament the same way the standings do
+                  const activeTournament =
+                    tournaments.find(t => {
+                      const s = new Date(t.start_date + 'T00:00:00');
+                      const e = tournamentEnd(t);
+                      return new Date() >= s && new Date() <= e;
+                    }) ||
+                    tournaments.find(t => {
+                      if (!t.start_date || !t.pick_deadline) return false;
+                      const s        = new Date(t.start_date + 'T00:00:00');
+                      const deadline = new Date(t.pick_deadline);
+                      const monday   = new Date(s); monday.setDate(s.getDate() - 3); monday.setHours(11,0,0,0);
+                      return new Date() >= monday && new Date() < deadline;
+                    });
+                  if (!activeTournament) return;
+
+                  // Compute standings using the same shared helper as the UI
+                  const standings = computeMemberStandings(contestMembers, contestPicks, field, activeTournament.id);
+
+                  // Build CSV rows — one row per golfer pick per contestant
+                  const headers = [
+                    "Rank", "Contestant", "Tiebreaker",
+                    "Golfer", "OWGR Rank", "Weighting", "Position", "Net Points", "Counts Toward Best 4"
+                  ];
+
+                  const rows = [];
+                  standings.forEach((s, i) => {
+                    // Sort picks same way as the detailed tracker — best net points first
+                    const sortedPicks = [...s.enrichedPicks].sort((a, b) => {
+                      if (a.netPoints && b.netPoints) return a.netPoints - b.netPoints;
+                      return (a.owgr || 999) - (b.owgr || 999);
+                    });
+                    sortedPicks.forEach(g => {
+                      const counts   = s.best4.some(b => b.golfer_name === g.golfer_name);
+                      const position = g.position === 80 ? "CUT" : g.position > 0 ? g.position : "—";
+                      const tiebreaker = s.enrichedPicks[0]?.tiebreaker !== undefined && s.enrichedPicks[0]?.tiebreaker !== null
+                        ? (s.enrichedPicks[0].tiebreaker > 0 ? `+${s.enrichedPicks[0].tiebreaker}` : String(s.enrichedPicks[0].tiebreaker))
+                        : "";
+                      rows.push([
+                        i + 1,
+                        s.member.name,
+                        tiebreaker,
+                        g.golfer_name,
+                        g.owgr ? `#${g.owgr}` : "—",
+                        g.weighting > 0 ? `+${g.weighting}` : g.weighting,
+                        position,
+                        g.position > 0 ? g.netPoints : "—",
+                        counts ? "Yes" : "No",
+                      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+                    });
+                    // Blank separator row between contestants for readability in Excel
+                    rows.push("");
+                  });
+
+                  const csv      = [headers.join(","), ...rows].join("\n");
+                  const blob     = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                  const url      = URL.createObjectURL(blob);
+                  const link     = document.createElement("a");
+                  const filename = `${activeTournament.name}_contest_standings_${new Date().toISOString().split("T")[0]}.csv`;
+                  link.setAttribute("href", url);
+                  link.setAttribute("download", filename);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }}
+                  style={{ background:"rgba(0,51,141,0.2)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"5px 12px", color:"#94a3b8", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontWeight:600, display:"flex", alignItems:"center", gap:5 }}>
+                  📥 Export
+                </button>
               </div>
               {(() => {
                 // Determine the active or upcoming tournament
