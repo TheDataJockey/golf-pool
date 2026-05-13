@@ -1211,9 +1211,14 @@ export default function App() {
               const myPicks        = picks.filter(p => p.baggers?.name === loggedInBagger?.name);
               const myCurrentPick  = myPicks.find(p => p.tournaments?.week_number === currentTournament.week_number);
               // Golfers used in prior weeks (not current) — blocked from re-selection
+              // We normalize special characters (e.g. Å→A, é→e) before comparing
+              // so that name variations between our picks table and the Datagolf
+              // field data don't cause already-used golfers to appear available.
+              const normalizeForCompare = (str) =>
+                (str || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
               const myPriorUsed    = myPicks
                 .filter(p => p.tournaments?.week_number !== currentTournament.week_number)
-                .map(p => p.golfer_name?.toLowerCase());
+                .map(p => normalizeForCompare(p.golfer_name));
               // Show ALL field players — used ones are color-coded, not hidden
               const myPriorPicks   = myPicks
                 .filter(p => p.tournaments?.week_number !== currentTournament.week_number)
@@ -1255,7 +1260,7 @@ export default function App() {
                         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
                           <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
                           <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>Week {currentTournament.week_number} — {currentTournament.name}</span>
-                          <span style={{ fontSize:11, color:"#475569", marginLeft:"auto" }}>{field.filter(p => !myPriorUsed.includes(p.player_name.toLowerCase())).length} available</span>
+                          <span style={{ fontSize:11, color:"#475569", marginLeft:"auto" }}>{field.filter(p => !myPriorUsed.includes(normalizeForCompare(p.player_name))).length} available</span>
                         </div>
                         <input value={searchPick} onChange={e => setSearchPick(e.target.value)} placeholder="Search golfers..."
                           style={{ width:"100%", background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 12px", color:BILLS_WHITE, fontSize:13, fontFamily:"'DM Sans', sans-serif", outline:"none", boxSizing:"border-box" }} />
@@ -1282,8 +1287,8 @@ export default function App() {
                               .filter(p => p.player_name.toLowerCase().includes(searchPick.toLowerCase()))
                               .map((player, i) => {
                                 const isSelected  = selectedPick === player.player_name;
-                                const alreadyUsed = myPriorUsed.includes(player.player_name.toLowerCase());
-                                const isCurrentPick = player.player_name.toLowerCase() === myCurrentPick?.golfer_name?.toLowerCase();
+                                const alreadyUsed = myPriorUsed.includes(normalizeForCompare(player.player_name));
+                                const isCurrentPick = normalizeForCompare(player.player_name) === normalizeForCompare(myCurrentPick?.golfer_name);
                                 // Color scheme:
                                 //   red bg     = currently selected this session
                                 //   grey/muted = already used in a prior week (blocked)
