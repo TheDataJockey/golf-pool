@@ -1114,10 +1114,17 @@ export default function App() {
                   // Apply sort
                   if (fieldSort === "name")     displayField.sort((a,b) => a.player_name.localeCompare(b.player_name));
                   else if (fieldSort === "position") displayField.sort((a,b) => {
-                    // Sort by current leaderboard position ascending; unscored players go to bottom
-                    const posA = a.current_position || 9999;
-                    const posB = b.current_position || 9999;
-                    return posA - posB;
+                    // Sort by current leaderboard position ascending.
+                    // Players with no position yet (0 or null) go to the bottom.
+                    // If neither player has a position yet, fall back to OWGR rank
+                    // so the list isn't random during pre-tournament or between rounds.
+                    const posA = a.current_position && a.current_position > 0 ? a.current_position : null;
+                    const posB = b.current_position && b.current_position > 0 ? b.current_position : null;
+                    if (posA !== null && posB !== null) return posA - posB;
+                    if (posA !== null) return -1;  // A has position, B doesn't → A first
+                    if (posB !== null) return 1;   // B has position, A doesn't → B first
+                    // Neither has a position — fall back to OWGR rank
+                    return (a.owgr_rank || 9999) - (b.owgr_rank || 9999);
                   });
                   else if (fieldSort === "picked") displayField.sort((a,b) => {
                     if (a.pickedBy && !b.pickedBy) return -1;
