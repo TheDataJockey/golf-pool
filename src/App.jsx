@@ -96,7 +96,11 @@ const NAV = [
   { id: "schedule",  label: "Schedule",       icon: "📅", pools: ["main","contest"] },
   { id: "members",   label: "Members",        icon: "👥", pools: ["main"] },
   { id: "contest",   label: "Mookie's Pool",  icon: "🏆", pools: ["main","contest"] },
+  { id: "admin",     label: "Admin Picks",    icon: "🔧", pools: ["main"], adminOnly: true },
 ];
+
+// Kyle's email — used to gate the Admin Picks page
+const ADMIN_EMAIL = "kjbialek@gmail.com";
 
 // ── Avatar component ───────────────────────────────────────
 // Renders a circular avatar that can be:
@@ -217,6 +221,228 @@ function computeMemberStandings(contestMembers, contestPicks, field, tournamentI
   });
 
   return standings;
+}
+
+// ══════════════════════════════════════════════════════════
+// AdminPicksPanel component
+// Used exclusively on the Admin Picks page.
+// Lets Kyle select a bagger, search the field, and submit
+// or update that bagger's pick for the current tournament.
+// ══════════════════════════════════════════════════════════
+function AdminPicksPanel({ tournament, baggers, picks, field, supabase, onPickSaved, m }) {
+  const [selectedBagger,  setSelectedBagger]  = useState(null);
+  const [adminPickSearch, setAdminPickSearch] = useState("");
+  const [adminSelected,   setAdminSelected]   = useState("");
+  const [saving,          setSaving]          = useState(false);
+  const [savedMsg,        setSavedMsg]        = useState("");
+
+  // Current pick for the selected bagger this tournament
+  const existingPick = selectedBagger
+    ? picks.find(p => p.baggers?.name === selectedBagger.name && p.tournaments?.week_number === tournament.week_number)
+    : null;
+
+  // Golfers already used by the selected bagger in prior weeks (once-per-season rule)
+  const normalizeForCompare = (str) =>
+    (str || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const priorUsed = selectedBagger
+    ? picks
+        .filter(p => p.baggers?.name === selectedBagger.name && p.tournaments?.week_number !== tournament.week_number)
+        .map(p => normalizeForCompare(p.golfer_name))
+    : [];
+
+  async function handleSavePick() {
+    if (!adminSelected || !selectedBagger) return;
+    setSaving(true);
+    setSavedMsg("");
+    const fieldPlayer = field.find(p => p.player_name === adminSelected);
+    const { error } = await supabase.from("picks").upsert({
+      bagger_id:     selectedBagger.id,
+      tournament_id: tournament.id,
+      golfer_name:   adminSelected,
+      datagolf_name: fieldPlayer?.datagolf_name || null,
+      earnings:      0,
+    }, { onConflict: "bagger_id,tournament_id" });
+    if (!error) {
+      await onPickSaved();
+      setSavedMsg(`✅ ${selectedBagger.name}'s pick saved: ${adminSelected}`);
+      setAdminSelected("");
+    } else {
+      setSavedMsg(`❌ Error: ${error.message}`);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+      {/* Tournament info */}
+      <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:12 }}>
+        <div>
+          <div style={{ fontSize:11, color:BILLS_RED, fontWeight:700, letterSpacing:"0.08em", marginBottom:4 }}>WEEK {tournament.week_number}</div>
+          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:16, color:BILLS_WHITE }}>{tournament.name}</div>
+          <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{tournament.course}</div>
+        </div>
+        <div style={{ fontFamily:"'DM Mono', monospace", fontSize:14, color:"#4a90d9", fontWeight:700 }}>
+          ${(tournament.purse / 1000000).toFixed(1)}M purse
+        </div>
+      </div>
+
+      {/* Step 1: Select a bagger */}
+      <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"12px 18px", borderBottom:`1px solid ${BORDER}`, display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
+          <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>Step 1 — Select a Bagger</span>
+        </div>
+        <div style={{ padding:12, display:"flex", flexWrap:"wrap", gap:8 }}>
+          {baggers.map((b, i) => {
+            const theirPick = picks.find(p => p.baggers?.name === b.name && p.tournaments?.week_number === tournament.week_number);
+            const isSelected = selectedBagger?.id === b.id;
+            return (
+              <button key={b.id}
+                onClick={() => { setSelectedBagger(b); setAdminSelected(""); setAdminPickSearch(""); setSavedMsg(""); }}
+                style={{ background: isSelected ? "rgba(198,12,48,0.15)" : "rgba(255,255,255,0.04)", border:`1px solid ${isSelected ? "rgba(198,12,48,0.5)" : BORDER}`, borderRadius:10, padding:"8px 14px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"flex-start", gap:3 }}>
+                <div style={{ fontSize:13, color: isSelected ? BILLS_WHITE : "#94a3b8", fontWeight: isSelected ? 600 : 400 }}>{b.name}</div>
+                {theirPick ? (
+                  <div style={{ fontSize:10, color:"#22c55e" }}>✓ {theirPick.golfer_name}</div>
+                ) : (
+                  <div style={{ fontSize:10, color:"#475569" }}>No pick yet</div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Step 2: Select a golfer (only shown after bagger is selected) */}
+      {selectedBagger && (
+        <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, overflow:"hidden" }}>
+          <div style={{ padding:"12px 18px", borderBottom:`1px solid ${BORDER}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
+              <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>
+                Step 2 — Pick for {selectedBagger.name}
+              </span>
+            </div>
+            {existingPick && (
+              <div style={{ fontSize:11, color:"#22c55e" }}>Current: {existingPick.golfer_name}</div>
+            )}
+          </div>
+
+          {/* Legend */}
+          <div style={{ padding:"10px 18px", borderBottom:`1px solid ${BORDER}`, display:"flex", gap:16, flexWrap:"wrap" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:"#94a3b8" }}>
+              <div style={{ width:10, height:10, borderRadius:2, background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.15)" }} /> Available
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:"#94a3b8" }}>
+              <div style={{ width:10, height:10, borderRadius:2, background:"rgba(198,12,48,0.2)", border:"1px solid rgba(198,12,48,0.5)" }} /> Selected
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, color:"#94a3b8" }}>
+              <div style={{ width:10, height:10, borderRadius:2, background:"rgba(100,116,139,0.15)", border:"1px solid rgba(100,116,139,0.3)" }} /> Already used this season
+            </div>
+          </div>
+
+          {/* Search */}
+          <div style={{ padding:"10px 18px", borderBottom:`1px solid ${BORDER}` }}>
+            <input value={adminPickSearch} onChange={e => setAdminPickSearch(e.target.value)} placeholder="Search golfers..."
+              style={{ width:"100%", background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"8px 12px", color:BILLS_WHITE, fontSize:13, fontFamily:"'DM Sans', sans-serif", outline:"none", boxSizing:"border-box" }} />
+          </div>
+
+          {/* Field list */}
+          <div style={{ maxHeight: m ? 280 : 400, overflowY:"auto" }}>
+            {field
+              .filter(p => p.player_name.toLowerCase().includes(adminPickSearch.toLowerCase()))
+              .map((player, i) => {
+                const isSelected   = adminSelected === player.player_name;
+                const alreadyUsed  = priorUsed.includes(normalizeForCompare(player.player_name));
+                const isCurrentPick = normalizeForCompare(player.player_name) === normalizeForCompare(existingPick?.golfer_name);
+                const rowBg = isSelected
+                  ? "rgba(198,12,48,0.12)"
+                  : alreadyUsed && !isCurrentPick
+                    ? "rgba(100,116,139,0.08)"
+                    : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent";
+                return (
+                  <div key={player.id}
+                    onClick={() => { if (!alreadyUsed || isCurrentPick) setAdminSelected(isSelected ? "" : player.player_name); }}
+                    style={{ display:"flex", alignItems:"center", padding:"9px 18px", borderBottom:`1px solid rgba(0,51,141,0.06)`, background:rowBg, borderLeft: isSelected ? `3px solid ${BILLS_RED}` : alreadyUsed && !isCurrentPick ? "3px solid rgba(100,116,139,0.3)" : "3px solid transparent", cursor: alreadyUsed && !isCurrentPick ? "default" : "pointer", opacity: alreadyUsed && !isCurrentPick ? 0.4 : 1 }}>
+                    <div style={{ width:44, fontFamily:"'DM Mono', monospace", fontSize:11, color: !player.owgr_rank ? "#334155" : player.owgr_rank <= 10 ? BILLS_RED : player.owgr_rank <= 50 ? "#4a90d9" : "#475569" }}>
+                      {player.owgr_rank ? `#${player.owgr_rank}` : "—"}
+                    </div>
+                    <div style={{ flex:1, fontSize:13, color: isSelected ? BILLS_WHITE : alreadyUsed && !isCurrentPick ? "#334155" : "#94a3b8", fontWeight: isSelected ? 600 : 400 }}>
+                      {player.player_name}
+                      {alreadyUsed && !isCurrentPick && <span style={{ fontSize:10, color:"#334155", marginLeft:6 }}>already used</span>}
+                    </div>
+                    {isSelected && <div style={{ fontSize:13, color:BILLS_RED, fontWeight:700 }}>✓</div>}
+                  </div>
+                );
+              })
+            }
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Confirm and save */}
+      {selectedBagger && (
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          {/* Summary of what will be saved */}
+          <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:12, padding:"12px 18px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
+            <div style={{ fontSize:13, color:"#64748b" }}>
+              {adminSelected
+                ? <span>Saving <span style={{ color:BILLS_WHITE, fontWeight:600 }}>{adminSelected}</span> for <span style={{ color:BILLS_WHITE, fontWeight:600 }}>{selectedBagger.name}</span></span>
+                : <span style={{ color:"#475569" }}>← Select a golfer above</span>}
+            </div>
+            {existingPick && adminSelected && adminSelected !== existingPick.golfer_name && (
+              <div style={{ fontSize:11, color:"#f59e0b" }}>⚠️ Will replace {existingPick.golfer_name}</div>
+            )}
+          </div>
+
+          {savedMsg && (
+            <div style={{ background: savedMsg.startsWith("✅") ? "rgba(34,197,94,0.1)" : "rgba(198,12,48,0.1)", border:`1px solid ${savedMsg.startsWith("✅") ? "rgba(34,197,94,0.3)" : "rgba(198,12,48,0.3)"}`, borderRadius:10, padding:"10px 16px", fontSize:13, color: savedMsg.startsWith("✅") ? "#22c55e" : "#f87171" }}>
+              {savedMsg}
+            </div>
+          )}
+
+          <button
+            disabled={!adminSelected || saving}
+            onClick={handleSavePick}
+            style={{ background: adminSelected && !saving ? BILLS_RED : "rgba(255,255,255,0.06)", border:"none", borderRadius:12, padding:"14px", color: adminSelected && !saving ? BILLS_WHITE : "#475569", fontFamily:"'DM Sans', sans-serif", fontSize:15, fontWeight:700, cursor: adminSelected && !saving ? "pointer" : "default", letterSpacing:"0.04em" }}>
+            {saving ? "Saving..." : adminSelected ? `⛳ Save ${selectedBagger.name}'s Pick →` : "Select a golfer to continue"}
+          </button>
+        </div>
+      )}
+
+      {/* Current week picks summary — shows all baggers and their picks at a glance */}
+      <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"12px 18px", borderBottom:`1px solid ${BORDER}`, display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
+          <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>Week {tournament.week_number} — All Picks</span>
+          <span style={{ fontSize:11, color:"#475569", marginLeft:"auto" }}>
+            {picks.filter(p => p.tournaments?.week_number === tournament.week_number).length}/{baggers.length} submitted
+          </span>
+        </div>
+        {baggers.map((b, i) => {
+          const theirPick = picks.find(p => p.baggers?.name === b.name && p.tournaments?.week_number === tournament.week_number);
+          return (
+            <div key={b.id} style={{ display:"flex", alignItems:"center", padding:"10px 18px", borderBottom:`1px solid rgba(0,51,141,0.06)`, background: i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent", gap:10 }}>
+              <Avatar bagger={b} size={26} i={i} />
+              <div style={{ width:60, fontSize:13, color:BILLS_WHITE, fontWeight:500 }}>{b.name}</div>
+              <div style={{ flex:1, fontSize:13, color: theirPick ? "#94a3b8" : "#334155" }}>
+                {theirPick ? theirPick.golfer_name : "—"}
+              </div>
+              {theirPick ? (
+                <div style={{ fontSize:11, color:"#22c55e" }}>✓</div>
+              ) : (
+                <button onClick={() => { setSelectedBagger(b); setAdminSelected(""); setAdminPickSearch(""); setSavedMsg(""); window.scrollTo({ top:0, behavior:"smooth" }); }}
+                  style={{ background:"rgba(198,12,48,0.1)", border:"1px solid rgba(198,12,48,0.3)", borderRadius:8, padding:"3px 10px", color:BILLS_RED, fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                  Enter Pick
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+    </div>
+  );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -675,7 +901,10 @@ export default function App() {
           <div style={{ display:"flex", overflowX:"auto", borderTop:`1px solid ${BORDER}` }}>
             {NAV.filter(item => {
               const userPools = loggedInBagger?.pools || loggedInMember?.pools || ["contest"];
-              return item.pools.some(p => userPools.includes(p));
+              if (!item.pools.some(p => userPools.includes(p))) return false;
+              // Admin-only pages are only visible to Kyle
+              if (item.adminOnly && loggedInBagger?.email?.toLowerCase() !== ADMIN_EMAIL) return false;
+              return true;
             }).map(item => (
               <button key={item.id} onClick={() => setPage(item.id)}
                 style={{ flex:"0 0 auto", background:"transparent", border:"none", borderBottom: page === item.id ? `2px solid ${BILLS_RED}` : "2px solid transparent", padding:"8px 14px", color: page === item.id ? BILLS_RED : "#64748b", fontFamily:"'DM Sans', sans-serif", fontSize:10, cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:2, minWidth:56, fontWeight: page === item.id ? 600 : 400 }}>
@@ -710,7 +939,9 @@ export default function App() {
           <nav style={{ display:"flex", flexDirection:"column", gap:4, flex:1 }}>
             {NAV.filter(item => {
               const userPools = loggedInBagger?.pools || loggedInMember?.pools || ["contest"];
-              return item.pools.some(p => userPools.includes(p));
+              if (!item.pools.some(p => userPools.includes(p))) return false;
+              if (item.adminOnly && loggedInBagger?.email?.toLowerCase() !== ADMIN_EMAIL) return false;
+              return true;
             }).map(item => (
               <button key={item.id} onClick={() => setPage(item.id)}
                 style={{ background: page === item.id ? "rgba(198,12,48,0.15)" : "transparent", border: page === item.id ? "1px solid rgba(198,12,48,0.4)" : "1px solid transparent", borderRadius:10, padding:"10px 14px", color: page === item.id ? "#ff6b6b" : "#64748b", fontFamily:"'DM Sans', sans-serif", fontSize:14, cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:10 }}>
@@ -2579,6 +2810,69 @@ export default function App() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════
+            ADMIN PICKS PAGE (Kyle only)
+            Lets Kyle enter picks on behalf of any bagger
+            for the current or upcoming tournament.
+            Only visible when logged in as kjbialek@gmail.com.
+            Supports selecting a bagger, searching the field,
+            and submitting or updating their pick.
+        ══════════════════════════════════════════════ */}
+        {page === "admin" && loggedInBagger?.email?.toLowerCase() === ADMIN_EMAIL && (
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+            {/* Security banner */}
+            <div style={{ background:"rgba(198,12,48,0.08)", border:"1px solid rgba(198,12,48,0.25)", borderRadius:14, padding:"14px 20px", display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ fontSize:20 }}>🔧</div>
+              <div>
+                <div style={{ fontSize:13, color:BILLS_WHITE, fontWeight:600 }}>Admin Picks Entry</div>
+                <div style={{ fontSize:11, color:"#64748b" }}>Enter or update picks on behalf of baggers. Only visible to you.</div>
+              </div>
+            </div>
+
+            {(() => {
+              // Find the active or upcoming tournament — same logic as My Pick page
+              const now = new Date();
+              const activeTournament = tournaments.find(t => {
+                if (!t.start_date || !t.end_date) return false;
+                const s = new Date(t.start_date + 'T00:00:00');
+                const e = tournamentEnd(t);
+                return now >= s && now <= e;
+              });
+              const nextPickableTournament = tournaments.find(t => {
+                if (!t.start_date || !t.pick_deadline) return false;
+                const s        = new Date(t.start_date + 'T00:00:00');
+                const deadline = new Date(t.pick_deadline);
+                const monday   = new Date(s); monday.setDate(s.getDate() - 3); monday.setHours(11,0,0,0);
+                return now >= monday && now < deadline;
+              });
+              const currentTournament = activeTournament || nextPickableTournament || tournaments.find(t => {
+                const s = new Date(t.start_date + 'T00:00:00');
+                const e = tournamentEnd(t);
+                return now >= s && now <= e && t.is_pool_event !== false;
+              });
+
+              if (!currentTournament) return (
+                <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, padding:32, textAlign:"center", color:"#64748b" }}>
+                  No active or upcoming tournament found.
+                </div>
+              );
+
+              return (
+                <AdminPicksPanel
+                  tournament={currentTournament}
+                  baggers={baggers}
+                  picks={picks}
+                  field={field}
+                  supabase={supabase}
+                  onPickSaved={fetchData}
+                  m={m}
+                />
+              );
+            })()}
           </div>
         )}
 
