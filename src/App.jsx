@@ -98,6 +98,7 @@ const NAV = [
   { id: "contest",   label: "Mookie's Pool",  icon: "🏆", pools: ["main","contest"] },
   { id: "admin",        label: "Admin Picks",    icon: "🔧", pools: ["main"], adminOnly: true },
   { id: "admincontest", label: "Admin Contest",  icon: "🎲", pools: ["main"], adminOnly: true },
+  { id: "adminmembers", label: "Admin Members", icon: "👤", pools: ["main"], adminOnly: true },
 ];
 
 // Kyle's email — used to gate the Admin Picks page
@@ -222,6 +223,377 @@ function computeMemberStandings(contestMembers, contestPicks, field, tournamentI
   });
 
   return standings;
+}
+
+// ══════════════════════════════════════════════════════════
+// AdminMembersPanel component
+// Manage baggers (main pool members) and contest members.
+// Supports adding new members, editing name/email,
+// and removing members. Kyle-only admin page.
+// ══════════════════════════════════════════════════════════
+function AdminMembersPanel({ baggers, contestMembers, supabase, onSaved, m }) {
+  const [tab,          setTab]          = useState("baggers");   // "baggers" or "contest"
+  const [editingId,    setEditingId]    = useState(null);        // ID of row being edited
+  const [editData,     setEditData]     = useState({});          // form data for edit
+  const [showAddForm,  setShowAddForm]  = useState(false);       // show add new member form
+  const [newMember,    setNewMember]    = useState({ name:"", email:"", pools:'["main"]' });
+  const [saving,       setSaving]       = useState(false);
+  const [msg,          setMsg]          = useState("");
+  const [confirmDelete,setConfirmDelete]= useState(null);        // ID to confirm deletion
+
+  function resetMsg() { setTimeout(() => setMsg(""), 3000); }
+
+  // ── Edit a bagger ──────────────────────────────────────
+  async function handleSaveBagger() {
+    if (!editData.name || !editData.email) { setMsg("❌ Name and email are required"); resetMsg(); return; }
+    setSaving(true);
+    const { error } = await supabase.from("baggers")
+      .update({ name: editData.name, email: editData.email.toLowerCase(), pools: editData.pools })
+      .eq("id", editingId);
+    if (!error) { await onSaved(); setEditingId(null); setMsg("✅ Bagger updated"); }
+    else { setMsg("❌ " + error.message); }
+    setSaving(false); resetMsg();
+  }
+
+  // ── Edit a contest member ──────────────────────────────
+  async function handleSaveContest() {
+    if (!editData.name) { setMsg("❌ Name is required"); resetMsg(); return; }
+    setSaving(true);
+    const { error } = await supabase.from("contest_members")
+      .update({ name: editData.name, email: editData.email?.toLowerCase() || null })
+      .eq("id", editingId);
+    if (!error) { await onSaved(); setEditingId(null); setMsg("✅ Member updated"); }
+    else { setMsg("❌ " + error.message); }
+    setSaving(false); resetMsg();
+  }
+
+  // ── Add new bagger ─────────────────────────────────────
+  async function handleAddBagger() {
+    if (!newMember.name || !newMember.email) { setMsg("❌ Name and email required"); resetMsg(); return; }
+    setSaving(true);
+    const { error } = await supabase.from("baggers").insert({
+      name:  newMember.name,
+      email: newMember.email.toLowerCase(),
+      pools: JSON.parse(newMember.pools),
+    });
+    if (!error) { await onSaved(); setShowAddForm(false); setNewMember({ name:"", email:"", pools:'["main"]' }); setMsg("✅ Bagger added"); }
+    else { setMsg("❌ " + error.message); }
+    setSaving(false); resetMsg();
+  }
+
+  // ── Add new contest member ─────────────────────────────
+  async function handleAddContest() {
+    if (!newMember.name) { setMsg("❌ Name required"); resetMsg(); return; }
+    setSaving(true);
+    const { error } = await supabase.from("contest_members").insert({
+      name:  newMember.name,
+      email: newMember.email?.toLowerCase() || null,
+      pools: ["contest"],
+    });
+    if (!error) { await onSaved(); setShowAddForm(false); setNewMember({ name:"", email:"", pools:'["main"]' }); setMsg("✅ Contest member added"); }
+    else { setMsg("❌ " + error.message); }
+    setSaving(false); resetMsg();
+  }
+
+  // ── Delete a bagger ────────────────────────────────────
+  async function handleDeleteBagger(id) {
+    setSaving(true);
+    const { error } = await supabase.from("baggers").delete().eq("id", id);
+    if (!error) { await onSaved(); setMsg("✅ Bagger removed"); setConfirmDelete(null); }
+    else { setMsg("❌ " + error.message); }
+    setSaving(false); resetMsg();
+  }
+
+  // ── Delete a contest member ────────────────────────────
+  async function handleDeleteContest(id) {
+    setSaving(true);
+    const { error } = await supabase.from("contest_members").delete().eq("id", id);
+    if (!error) { await onSaved(); setMsg("✅ Member removed"); setConfirmDelete(null); }
+    else { setMsg("❌ " + error.message); }
+    setSaving(false); resetMsg();
+  }
+
+  const inputStyle = {
+    background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8,
+    padding:"8px 12px", color:BILLS_WHITE, fontSize:13,
+    fontFamily:"'DM Sans', sans-serif", outline:"none", width:"100%", boxSizing:"border-box"
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+      {/* Header */}
+      <div style={{ background:"rgba(198,12,48,0.08)", border:"1px solid rgba(198,12,48,0.25)", borderRadius:14, padding:"14px 20px", display:"flex", alignItems:"center", gap:12 }}>
+        <div style={{ fontSize:20 }}>👤</div>
+        <div>
+          <div style={{ fontSize:13, color:BILLS_WHITE, fontWeight:600 }}>Admin — Member Management</div>
+          <div style={{ fontSize:11, color:"#64748b" }}>Add, edit, or remove baggers and contest members.</div>
+        </div>
+      </div>
+
+      {/* Tab selector */}
+      <div style={{ display:"flex", gap:8 }}>
+        {[{ id:"baggers", label:`🏌️ Baggers (${baggers.length})` }, { id:"contest", label:`🏆 Contest Members (${contestMembers.length})` }].map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setEditingId(null); setShowAddForm(false); setMsg(""); }}
+            style={{ background: tab === t.id ? "rgba(198,12,48,0.15)" : "rgba(255,255,255,0.04)", border:`1px solid ${tab === t.id ? "rgba(198,12,48,0.4)" : BORDER}`, borderRadius:10, padding:"8px 16px", color: tab === t.id ? BILLS_WHITE : "#64748b", fontSize:13, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontWeight: tab === t.id ? 600 : 400 }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Status message */}
+      {msg && (
+        <div style={{ background: msg.startsWith("✅") ? "rgba(34,197,94,0.1)" : "rgba(198,12,48,0.1)", border:`1px solid ${msg.startsWith("✅") ? "rgba(34,197,94,0.3)" : "rgba(198,12,48,0.3)"}`, borderRadius:10, padding:"10px 16px", fontSize:13, color: msg.startsWith("✅") ? "#22c55e" : "#f87171" }}>
+          {msg}
+        </div>
+      )}
+
+      {/* ── BAGGERS TAB ── */}
+      {tab === "baggers" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+
+          {/* Add new bagger form */}
+          <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, overflow:"hidden" }}>
+            <div style={{ padding:"12px 18px", borderBottom:`1px solid ${BORDER}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
+                <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>Add New Bagger</span>
+              </div>
+              <button onClick={() => setShowAddForm(!showAddForm)}
+                style={{ background: showAddForm ? "rgba(198,12,48,0.15)" : "rgba(255,255,255,0.06)", border:`1px solid ${showAddForm ? "rgba(198,12,48,0.4)" : BORDER}`, borderRadius:8, padding:"5px 14px", color: showAddForm ? BILLS_RED : "#64748b", fontSize:12, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontWeight:600 }}>
+                {showAddForm ? "✕ Cancel" : "+ Add Bagger"}
+              </button>
+            </div>
+            {showAddForm && (
+              <div style={{ padding:16, display:"flex", flexDirection:"column", gap:10 }}>
+                <div style={{ display:"grid", gridTemplateColumns: m ? "1fr" : "1fr 1fr auto", gap:10, alignItems:"end" }}>
+                  <div>
+                    <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>NAME</div>
+                    <input value={newMember.name} onChange={e => setNewMember(p => ({ ...p, name:e.target.value }))} placeholder="Full name" style={inputStyle} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>EMAIL</div>
+                    <input value={newMember.email} onChange={e => setNewMember(p => ({ ...p, email:e.target.value }))} placeholder="email@example.com" type="email" style={inputStyle} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>POOLS</div>
+                    <select value={newMember.pools} onChange={e => setNewMember(p => ({ ...p, pools:e.target.value }))}
+                      style={{ ...inputStyle, width: m ? "100%" : "auto" }}>
+                      <option value='["main"]'>Main only</option>
+                      <option value='["main","contest"]'>Main + Contest</option>
+                      <option value='["contest"]'>Contest only</option>
+                    </select>
+                  </div>
+                </div>
+                <button onClick={handleAddBagger} disabled={saving}
+                  style={{ background:BILLS_RED, border:"none", borderRadius:10, padding:"10px 20px", color:BILLS_WHITE, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", alignSelf:"flex-start" }}>
+                  {saving ? "Saving..." : "⛳ Add Bagger"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Baggers list */}
+          <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, overflow:"hidden" }}>
+            <div style={{ padding:"12px 18px", borderBottom:`1px solid ${BORDER}` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
+                <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>Current Baggers</span>
+                <span style={{ fontSize:11, color:"#475569", marginLeft:"auto" }}>{baggers.length} members</span>
+              </div>
+            </div>
+            {baggers.map((b, i) => (
+              <div key={b.id} style={{ borderBottom:`1px solid rgba(0,51,141,0.06)`, background: i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent" }}>
+                {editingId === b.id ? (
+                  // Edit mode
+                  <div style={{ padding:"12px 18px", display:"flex", flexDirection:"column", gap:10 }}>
+                    <div style={{ display:"grid", gridTemplateColumns: m ? "1fr" : "1fr 1fr auto", gap:10, alignItems:"end" }}>
+                      <div>
+                        <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>NAME</div>
+                        <input value={editData.name || ""} onChange={e => setEditData(p => ({ ...p, name:e.target.value }))} style={inputStyle} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>EMAIL</div>
+                        <input value={editData.email || ""} onChange={e => setEditData(p => ({ ...p, email:e.target.value }))} type="email" style={inputStyle} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>POOLS</div>
+                        <select value={JSON.stringify(editData.pools || ["main"])} onChange={e => setEditData(p => ({ ...p, pools:JSON.parse(e.target.value) }))}
+                          style={{ ...inputStyle, width: m ? "100%" : "auto" }}>
+                          <option value='["main"]'>Main only</option>
+                          <option value='["main","contest"]'>Main + Contest</option>
+                          <option value='["contest"]'>Contest only</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={handleSaveBagger} disabled={saving}
+                        style={{ background:BILLS_RED, border:"none", borderRadius:8, padding:"7px 16px", color:BILLS_WHITE, fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                        {saving ? "Saving..." : "Save"}
+                      </button>
+                      <button onClick={() => setEditingId(null)}
+                        style={{ background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"7px 16px", color:"#64748b", fontSize:12, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : confirmDelete === b.id ? (
+                  // Delete confirmation
+                  <div style={{ padding:"12px 18px", display:"flex", alignItems:"center", gap:12, background:"rgba(198,12,48,0.06)" }}>
+                    <div style={{ flex:1, fontSize:13, color:BILLS_WHITE }}>⚠️ Remove <strong>{b.name}</strong>? This cannot be undone.</div>
+                    <button onClick={() => handleDeleteBagger(b.id)} disabled={saving}
+                      style={{ background:BILLS_RED, border:"none", borderRadius:8, padding:"6px 14px", color:BILLS_WHITE, fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                      {saving ? "..." : "Confirm"}
+                    </button>
+                    <button onClick={() => setConfirmDelete(null)}
+                      style={{ background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"6px 14px", color:"#64748b", fontSize:12, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  // View mode
+                  <div style={{ padding:"12px 18px", display:"flex", alignItems:"center", gap:12 }}>
+                    <Avatar bagger={b} size={32} i={i} />
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, color:BILLS_WHITE, fontWeight:600 }}>{b.name}</div>
+                      <div style={{ fontSize:11, color:"#64748b" }}>{b.email}</div>
+                    </div>
+                    <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+                      {(b.pools || []).map(p => (
+                        <span key={p} style={{ fontSize:10, background:"rgba(0,51,141,0.2)", border:`1px solid ${BORDER}`, borderRadius:20, padding:"2px 8px", color:"#94a3b8" }}>{p}</span>
+                      ))}
+                    </div>
+                    <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                      <button onClick={() => { setEditingId(b.id); setEditData({ name:b.name, email:b.email, pools:b.pools || ["main"] }); setConfirmDelete(null); }}
+                        style={{ background:"rgba(0,51,141,0.2)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"5px 12px", color:"#94a3b8", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                        ✏️ Edit
+                      </button>
+                      <button onClick={() => { setConfirmDelete(b.id); setEditingId(null); }}
+                        style={{ background:"rgba(198,12,48,0.1)", border:"1px solid rgba(198,12,48,0.3)", borderRadius:8, padding:"5px 12px", color:BILLS_RED, fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── CONTEST MEMBERS TAB ── */}
+      {tab === "contest" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+
+          {/* Add new contest member form */}
+          <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, overflow:"hidden" }}>
+            <div style={{ padding:"12px 18px", borderBottom:`1px solid ${BORDER}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
+                <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>Add New Contest Member</span>
+              </div>
+              <button onClick={() => setShowAddForm(!showAddForm)}
+                style={{ background: showAddForm ? "rgba(198,12,48,0.15)" : "rgba(255,255,255,0.06)", border:`1px solid ${showAddForm ? "rgba(198,12,48,0.4)" : BORDER}`, borderRadius:8, padding:"5px 14px", color: showAddForm ? BILLS_RED : "#64748b", fontSize:12, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontWeight:600 }}>
+                {showAddForm ? "✕ Cancel" : "+ Add Member"}
+              </button>
+            </div>
+            {showAddForm && (
+              <div style={{ padding:16, display:"flex", flexDirection:"column", gap:10 }}>
+                <div style={{ display:"grid", gridTemplateColumns: m ? "1fr" : "1fr 1fr", gap:10 }}>
+                  <div>
+                    <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>NAME</div>
+                    <input value={newMember.name} onChange={e => setNewMember(p => ({ ...p, name:e.target.value }))} placeholder="Full name" style={inputStyle} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>EMAIL (optional)</div>
+                    <input value={newMember.email} onChange={e => setNewMember(p => ({ ...p, email:e.target.value }))} placeholder="email@example.com" type="email" style={inputStyle} />
+                  </div>
+                </div>
+                <button onClick={handleAddContest} disabled={saving}
+                  style={{ background:BILLS_RED, border:"none", borderRadius:10, padding:"10px 20px", color:BILLS_WHITE, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", alignSelf:"flex-start" }}>
+                  {saving ? "Saving..." : "🏆 Add Member"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Contest members list */}
+          <div style={{ background:"rgba(0,51,141,0.08)", border:`1px solid ${BORDER}`, borderRadius:14, overflow:"hidden" }}>
+            <div style={{ padding:"12px 18px", borderBottom:`1px solid ${BORDER}` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:4, height:16, background:BILLS_RED, borderRadius:2 }} />
+                <span style={{ fontFamily:"'Playfair Display', serif", fontSize:14, color:BILLS_WHITE }}>Contest Members</span>
+                <span style={{ fontSize:11, color:"#475569", marginLeft:"auto" }}>{contestMembers.length} members</span>
+              </div>
+            </div>
+            {contestMembers.map((member, i) => (
+              <div key={member.id} style={{ borderBottom:`1px solid rgba(0,51,141,0.06)`, background: i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent" }}>
+                {editingId === member.id ? (
+                  // Edit mode
+                  <div style={{ padding:"12px 18px", display:"flex", flexDirection:"column", gap:10 }}>
+                    <div style={{ display:"grid", gridTemplateColumns: m ? "1fr" : "1fr 1fr", gap:10 }}>
+                      <div>
+                        <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>NAME</div>
+                        <input value={editData.name || ""} onChange={e => setEditData(p => ({ ...p, name:e.target.value }))} style={inputStyle} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>EMAIL</div>
+                        <input value={editData.email || ""} onChange={e => setEditData(p => ({ ...p, email:e.target.value }))} type="email" style={inputStyle} />
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={handleSaveContest} disabled={saving}
+                        style={{ background:BILLS_RED, border:"none", borderRadius:8, padding:"7px 16px", color:BILLS_WHITE, fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                        {saving ? "Saving..." : "Save"}
+                      </button>
+                      <button onClick={() => setEditingId(null)}
+                        style={{ background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"7px 16px", color:"#64748b", fontSize:12, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : confirmDelete === member.id ? (
+                  // Delete confirmation
+                  <div style={{ padding:"12px 18px", display:"flex", alignItems:"center", gap:12, background:"rgba(198,12,48,0.06)" }}>
+                    <div style={{ flex:1, fontSize:13, color:BILLS_WHITE }}>⚠️ Remove <strong>{member.name}</strong>? This cannot be undone.</div>
+                    <button onClick={() => handleDeleteContest(member.id)} disabled={saving}
+                      style={{ background:BILLS_RED, border:"none", borderRadius:8, padding:"6px 14px", color:BILLS_WHITE, fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                      {saving ? "..." : "Confirm"}
+                    </button>
+                    <button onClick={() => setConfirmDelete(null)}
+                      style={{ background:"rgba(255,255,255,0.06)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"6px 14px", color:"#64748b", fontSize:12, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  // View mode
+                  <div style={{ padding:"12px 18px", display:"flex", alignItems:"center", gap:12 }}>
+                    <div style={{ width:32, height:32, borderRadius:"50%", background:`${COLORS[i % COLORS.length]}22`, border:`2px solid ${COLORS[i % COLORS.length]}66`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, color:COLORS[i % COLORS.length], fontWeight:700, flexShrink:0 }}>
+                      {member.name?.[0]}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, color:BILLS_WHITE, fontWeight:600 }}>{member.name}</div>
+                      <div style={{ fontSize:11, color:"#64748b" }}>{member.email || <span style={{ color:"#334155" }}>No email set</span>}</div>
+                    </div>
+                    <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                      <button onClick={() => { setEditingId(member.id); setEditData({ name:member.name, email:member.email || "" }); setConfirmDelete(null); }}
+                        style={{ background:"rgba(0,51,141,0.2)", border:`1px solid ${BORDER}`, borderRadius:8, padding:"5px 12px", color:"#94a3b8", fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                        ✏️ Edit
+                      </button>
+                      <button onClick={() => { setConfirmDelete(member.id); setEditingId(null); }}
+                        style={{ background:"rgba(198,12,48,0.1)", border:"1px solid rgba(198,12,48,0.3)", borderRadius:8, padding:"5px 12px", color:BILLS_RED, fontSize:11, cursor:"pointer", fontFamily:"'DM Sans', sans-serif" }}>
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3248,6 +3620,21 @@ export default function App() {
               );
             })()}
           </div>
+        )}
+
+        {/* ══════════════════════════════════════════════
+            ADMIN MEMBERS PAGE (Kyle only)
+            Manage baggers (main pool) and contest members.
+            Add new members, edit emails/names, remove members.
+        ══════════════════════════════════════════════ */}
+        {page === "adminmembers" && loggedInBagger?.email?.toLowerCase() === ADMIN_EMAIL && (
+          <AdminMembersPanel
+            baggers={baggers}
+            contestMembers={contestMembers}
+            supabase={supabase}
+            onSaved={fetchData}
+            m={m}
+          />
         )}
 
         {/* ── IMAGE LIGHTBOX ── */}
